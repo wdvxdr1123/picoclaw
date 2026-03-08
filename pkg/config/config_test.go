@@ -283,6 +283,9 @@ func TestDefaultConfig_Channels(t *testing.T) {
 	if cfg.Channels.Slack.Enabled {
 		t.Error("Slack should be disabled by default")
 	}
+	if cfg.Channels.QQBot.Enabled {
+		t.Error("QQBot should be disabled by default")
+	}
 }
 
 // TestDefaultConfig_WebTools verifies web tools config

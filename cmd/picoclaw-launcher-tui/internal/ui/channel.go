@@ -32,6 +32,12 @@ func (s *appState) buildChannelMenuItems() []MenuItem {
 			func() { s.push("channel-qq", s.qqForm()) },
 		),
 		channelItem(
+			"QQ Bot",
+			"QQ Bot open platform settings",
+			s.config.Channels.QQBot.Enabled,
+			func() { s.push("channel-qqbot", s.qqBotForm()) },
+		),
+		channelItem(
 			"MaixCam",
 			"MaixCam gateway",
 			s.config.Channels.MaixCam.Enabled,
@@ -143,6 +149,28 @@ func (s *appState) qqForm() tview.Primitive {
 	form.AddInputField("App Secret", cfg.AppSecret, 128, nil, func(text string) {
 		cfg.AppSecret = strings.TrimSpace(text)
 	})
+	addAllowFromField(form, &cfg.AllowFrom)
+	return wrapWithBack(form, s)
+}
+
+func (s *appState) qqBotForm() tview.Primitive {
+	cfg := &s.config.Channels.QQBot
+	form := baseChannelForm("QQ Bot", cfg.Enabled, s.makeChannelOnEnabled(&cfg.Enabled))
+	form.AddInputField("App ID", cfg.AppID, 64, nil, func(text string) {
+		cfg.AppID = strings.TrimSpace(text)
+	})
+	form.AddInputField("Client Secret", cfg.ClientSecret, 128, nil, func(text string) {
+		cfg.ClientSecret = strings.TrimSpace(text)
+	})
+	form.AddCheckbox("Markdown Support", cfg.MarkdownSupport, func(checked bool) {
+		cfg.MarkdownSupport = checked
+	})
+	form.AddInputField("DM Policy", cfg.DmPolicy, 32, nil, func(text string) {
+		cfg.DmPolicy = strings.TrimSpace(text)
+	})
+	addIntField(form, "Text Chunk Limit", cfg.TextChunkLimit, func(value int) { cfg.TextChunkLimit = value })
+	addIntField(form, "Max File Size MB", cfg.MaxFileSizeMB, func(value int) { cfg.MaxFileSizeMB = value })
+	addIntField(form, "Media Timeout Ms", cfg.MediaTimeoutMs, func(value int) { cfg.MediaTimeoutMs = value })
 	addAllowFromField(form, &cfg.AllowFrom)
 	return wrapWithBack(form, s)
 }

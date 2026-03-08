@@ -172,11 +172,11 @@ type SessionConfig struct {
 // (message length, code blocks, tool call history, conversation depth, attachments).
 // Messages scoring below Threshold are sent to LightModel; all others use the
 // agent's primary model. This reduces cost and latency for simple tasks without
-// requiring any keyword matching — all scoring is language-agnostic.
+// requiring any keyword matching - all scoring is language-agnostic.
 type RoutingConfig struct {
 	Enabled    bool    `json:"enabled"`
 	LightModel string  `json:"light_model"` // model_name from model_list to use for simple tasks
-	Threshold  float64 `json:"threshold"`   // complexity score in [0,1]; score >= threshold → primary model
+	Threshold  float64 `json:"threshold"`   // complexity score in [0,1]; score >= threshold -> primary model
 }
 
 type AgentDefaults struct {
@@ -223,6 +223,7 @@ type ChannelsConfig struct {
 	Discord    DiscordConfig    `json:"discord"`
 	MaixCam    MaixCamConfig    `json:"maixcam"`
 	QQ         QQConfig         `json:"qq"`
+	QQBot      QQBotConfig      `json:"qqbot"`
 	DingTalk   DingTalkConfig   `json:"dingtalk"`
 	Slack      SlackConfig      `json:"slack"`
 	LINE       LINEConfig       `json:"line"`
@@ -312,6 +313,22 @@ type QQConfig struct {
 	AllowMarkdown      bool                `json:"allow_markdown"          env:"PICOCLAW_CHANNELS_QQ_ALLOW_MARKDOWN"`
 	GroupTrigger       GroupTriggerConfig  `json:"group_trigger,omitempty"`
 	ReasoningChannelID string              `json:"reasoning_channel_id"    env:"PICOCLAW_CHANNELS_QQ_REASONING_CHANNEL_ID"`
+}
+
+type QQBotConfig struct {
+	Enabled            bool                `json:"enabled"                 env:"PICOCLAW_CHANNELS_QQBOT_ENABLED"`
+	AppID              string              `json:"app_id"                  env:"PICOCLAW_CHANNELS_QQBOT_APP_ID"`
+	ClientSecret       string              `json:"client_secret"           env:"PICOCLAW_CHANNELS_QQBOT_CLIENT_SECRET"`
+	AllowFrom          FlexibleStringSlice `json:"allow_from"              env:"PICOCLAW_CHANNELS_QQBOT_ALLOW_FROM"`
+	GroupAllowFrom     FlexibleStringSlice `json:"group_allow_from"        env:"PICOCLAW_CHANNELS_QQBOT_GROUP_ALLOW_FROM"`
+	MarkdownSupport    bool                `json:"markdown_support"        env:"PICOCLAW_CHANNELS_QQBOT_MARKDOWN_SUPPORT"`
+	DmPolicy           string              `json:"dm_policy"               env:"PICOCLAW_CHANNELS_QQBOT_DM_POLICY"`
+	GroupPolicy        string              `json:"group_policy"            env:"PICOCLAW_CHANNELS_QQBOT_GROUP_POLICY"`
+	RequireMention     bool                `json:"require_mention"         env:"PICOCLAW_CHANNELS_QQBOT_REQUIRE_MENTION"`
+	TextChunkLimit     int                 `json:"text_chunk_limit"        env:"PICOCLAW_CHANNELS_QQBOT_TEXT_CHUNK_LIMIT"`
+	MaxFileSizeMB      int                 `json:"max_file_size_mb"        env:"PICOCLAW_CHANNELS_QQBOT_MAX_FILE_SIZE_MB"`
+	MediaTimeoutMs     int                 `json:"media_timeout_ms"        env:"PICOCLAW_CHANNELS_QQBOT_MEDIA_TIMEOUT_MS"`
+	ReasoningChannelID string              `json:"reasoning_channel_id"    env:"PICOCLAW_CHANNELS_QQBOT_REASONING_CHANNEL_ID"`
 }
 
 type DingTalkConfig struct {

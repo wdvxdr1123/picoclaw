@@ -22,6 +22,7 @@ import (
 	_ "github.com/sipeed/picoclaw/pkg/channels/onebot"
 	_ "github.com/sipeed/picoclaw/pkg/channels/pico"
 	_ "github.com/sipeed/picoclaw/pkg/channels/qq"
+	_ "github.com/sipeed/picoclaw/pkg/channels/qqbot"
 	_ "github.com/sipeed/picoclaw/pkg/channels/slack"
 	_ "github.com/sipeed/picoclaw/pkg/channels/telegram"
 	_ "github.com/sipeed/picoclaw/pkg/channels/wecom"
@@ -43,7 +44,7 @@ import (
 func gatewayCmd(debug bool) error {
 	if debug {
 		logger.SetLevel(logger.DEBUG)
-		fmt.Println("🔍 Debug mode enabled")
+		fmt.Println("[debug] Debug mode enabled")
 	}
 
 	cfg, err := internal.LoadConfig()
@@ -65,12 +66,12 @@ func gatewayCmd(debug bool) error {
 	agentLoop := agent.NewAgentLoop(cfg, msgBus, provider)
 
 	// Print agent startup info
-	fmt.Println("\n📦 Agent Status:")
+	fmt.Println("\nAgent Status:")
 	startupInfo := agentLoop.GetStartupInfo()
 	toolsInfo := startupInfo["tools"].(map[string]any)
 	skillsInfo := startupInfo["skills"].(map[string]any)
-	fmt.Printf("  • Tools: %d loaded\n", toolsInfo["count"])
-	fmt.Printf("  • Skills: %d/%d available\n",
+	fmt.Printf("  - Tools: %d loaded\n", toolsInfo["count"])
+	fmt.Printf("  - Skills: %d/%d available\n",
 		skillsInfo["available"],
 		skillsInfo["total"])
 
@@ -144,12 +145,12 @@ func gatewayCmd(debug bool) error {
 
 	enabledChannels := channelManager.GetEnabledChannels()
 	if len(enabledChannels) > 0 {
-		fmt.Printf("✓ Channels enabled: %s\n", enabledChannels)
+		fmt.Printf("[ok] Channels enabled: %s\n", enabledChannels)
 	} else {
-		fmt.Println("⚠ Warning: No channels enabled")
+		fmt.Println("[warn] No channels enabled")
 	}
 
-	fmt.Printf("✓ Gateway started on %s:%d\n", cfg.Gateway.Host, cfg.Gateway.Port)
+	fmt.Printf("[ok] Gateway started on %s:%d\n", cfg.Gateway.Host, cfg.Gateway.Port)
 	fmt.Println("Press Ctrl+C to stop")
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -158,12 +159,12 @@ func gatewayCmd(debug bool) error {
 	if err := cronService.Start(); err != nil {
 		fmt.Printf("Error starting cron service: %v\n", err)
 	}
-	fmt.Println("✓ Cron service started")
+	fmt.Println("[ok] Cron service started")
 
 	if err := heartbeatService.Start(); err != nil {
 		fmt.Printf("Error starting heartbeat service: %v\n", err)
 	}
-	fmt.Println("✓ Heartbeat service started")
+	fmt.Println("[ok] Heartbeat service started")
 
 	stateManager := state.NewManager(cfg.WorkspacePath())
 	deviceService := devices.NewService(devices.Config{
@@ -174,7 +175,7 @@ func gatewayCmd(debug bool) error {
 	if err := deviceService.Start(ctx); err != nil {
 		fmt.Printf("Error starting device service: %v\n", err)
 	} else if cfg.Devices.Enabled {
-		fmt.Println("✓ Device event service started")
+		fmt.Println("[ok] Device event service started")
 	}
 
 	// Setup shared HTTP server with health endpoints and webhook handlers
@@ -187,7 +188,7 @@ func gatewayCmd(debug bool) error {
 		return err
 	}
 
-	fmt.Printf("✓ Health endpoints available at http://%s:%d/health and /ready\n", cfg.Gateway.Host, cfg.Gateway.Port)
+	fmt.Printf("[ok] Health endpoints available at http://%s:%d/health and /ready\n", cfg.Gateway.Host, cfg.Gateway.Port)
 
 	go agentLoop.Run(ctx)
 
@@ -213,7 +214,7 @@ func gatewayCmd(debug bool) error {
 	cronService.Stop()
 	mediaStore.Stop()
 	agentLoop.Stop()
-	fmt.Println("✓ Gateway stopped")
+	fmt.Println("[ok] Gateway stopped")
 
 	return nil
 }

@@ -87,8 +87,8 @@ else ifeq ($(UNAME_S),Darwin)
 		ARCH=$(UNAME_M)
 	endif
 else
-	PLATFORM=$(UNAME_S)
-	ARCH=$(UNAME_M)
+	PLATFORM=$(GOOS)
+	ARCH=$(GOARCH)
 endif
 
 BINARY_PATH=$(BUILD_DIR)/$(BINARY_NAME)-$(PLATFORM)-$(ARCH)
