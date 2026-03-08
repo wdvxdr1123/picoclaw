@@ -11,7 +11,8 @@ PicoClaw 通过 QQ 开放平台的官方机器人 API 提供对 QQ 的支持。
       "enabled": true,
       "app_id": "YOUR_APP_ID",
       "app_secret": "YOUR_APP_SECRET",
-      "allow_from": []
+      "allow_from": [],
+      "allow_markdown": false
     }
   }
 }
@@ -23,6 +24,7 @@ PicoClaw 通过 QQ 开放平台的官方机器人 API 提供对 QQ 的支持。
 | app_id     | string | 是   | QQ 机器人应用的 App ID           |
 | app_secret | string | 是   | QQ 机器人应用的 App Secret       |
 | allow_from | array  | 否   | 用户ID白名单，空表示允许所有用户 |
+| allow_markdown| bool| 否   | 是否允许使用 Markdown 格式发送消息 |
 
 ## 设置流程
 

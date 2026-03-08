@@ -122,12 +122,21 @@ func (c *QQChannel) Send(ctx context.Context, msg bus.OutboundMessage) error {
 	}
 
 	// construct message
-	msgToCreate := &dto.MessageToCreate{
+	msgToCreate := dto.MessageToCreate{
 		Content: msg.Content,
+		MsgType: dto.TextMsg,
+	}
+	if c.config.AllowMarkdown {
+		msgToCreate = dto.MessageToCreate{
+			MsgType: dto.MarkdownMsg,
+			Markdown: &dto.Markdown{
+				Content: msg.Content,
+			},
+		}
 	}
 
 	// send C2C message
-	_, err := c.api.PostC2CMessage(ctx, msg.ChatID, msgToCreate)
+	_, err := c.api.PostC2CMessage(ctx, msg.ChatID, &msgToCreate)
 	if err != nil {
 		logger.ErrorCF("qq", "Failed to send C2C message", map[string]any{
 			"error": err.Error(),
