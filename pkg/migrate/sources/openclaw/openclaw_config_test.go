@@ -600,13 +600,6 @@ func TestToStandardConfig(t *testing.T) {
 		t.Errorf("expected api key 'sk-ant-test', got '%s'", foundAPIKey)
 	}
 
-	if !stdCfg.Channels.Telegram.Enabled {
-		t.Error("telegram should be enabled")
-	}
-	if stdCfg.Channels.Telegram.Token != "test-token" {
-		t.Errorf("expected token 'test-token', got '%s'", stdCfg.Channels.Telegram.Token)
-	}
-
 	if stdCfg.Gateway.Port != 8080 {
 		t.Errorf("expected gateway port 8080, got %d", stdCfg.Gateway.Port)
 	}

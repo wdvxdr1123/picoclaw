@@ -14,18 +14,6 @@ func (s *appState) buildChannelMenuItems() []MenuItem {
 	return []MenuItem{
 		{Label: "Back", Description: "Return to main menu", Action: func() { s.pop() }},
 		channelItem(
-			"Telegram",
-			"Telegram bot settings",
-			s.config.Channels.Telegram.Enabled,
-			func() { s.push("channel-telegram", s.telegramForm()) },
-		),
-		channelItem(
-			"Discord",
-			"Discord bot settings",
-			s.config.Channels.Discord.Enabled,
-			func() { s.push("channel-discord", s.discordForm()) },
-		),
-		channelItem(
 			"QQ",
 			"QQ bot settings",
 			s.config.Channels.QQ.Enabled,
@@ -36,18 +24,6 @@ func (s *appState) buildChannelMenuItems() []MenuItem {
 			"QQ Bot open platform settings",
 			s.config.Channels.QQBot.Enabled,
 			func() { s.push("channel-qqbot", s.qqBotForm()) },
-		),
-		channelItem(
-			"MaixCam",
-			"MaixCam gateway",
-			s.config.Channels.MaixCam.Enabled,
-			func() { s.push("channel-maixcam", s.maixcamForm()) },
-		),
-		channelItem(
-			"WhatsApp",
-			"WhatsApp bridge",
-			s.config.Channels.WhatsApp.Enabled,
-			func() { s.push("channel-whatsapp", s.whatsappForm()) },
 		),
 		channelItem(
 			"Feishu",
@@ -62,34 +38,10 @@ func (s *appState) buildChannelMenuItems() []MenuItem {
 			func() { s.push("channel-dingtalk", s.dingtalkForm()) },
 		),
 		channelItem(
-			"Slack",
-			"Slack bot settings",
-			s.config.Channels.Slack.Enabled,
-			func() { s.push("channel-slack", s.slackForm()) },
-		),
-		channelItem(
-			"LINE",
-			"LINE bot settings",
-			s.config.Channels.LINE.Enabled,
-			func() { s.push("channel-line", s.lineForm()) },
-		),
-		channelItem(
 			"OneBot",
 			"OneBot settings",
 			s.config.Channels.OneBot.Enabled,
 			func() { s.push("channel-onebot", s.onebotForm()) },
-		),
-		channelItem(
-			"WeCom",
-			"WeCom bot settings",
-			s.config.Channels.WeCom.Enabled,
-			func() { s.push("channel-wecom", s.wecomForm()) },
-		),
-		channelItem(
-			"WeCom App",
-			"WeCom App settings",
-			s.config.Channels.WeComApp.Enabled,
-			func() { s.push("channel-wecomapp", s.wecomAppForm()) },
 		),
 	}
 }
