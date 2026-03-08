@@ -1262,7 +1262,8 @@ picoclaw agent -m "Hello"
       "enabled": false,
       "app_id": "",
       "app_secret": "",
-      "allow_from": []
+      "allow_from": [],
+      "allow_markdown": false
     }
   },
   "tools": {
