@@ -1563,9 +1563,6 @@ func (al *AgentLoop) retryLLMCall(
 	prompt string,
 	maxRetries int,
 ) (*providers.LLMResponse, error) {
-	const (
-		llmTemperature = 0.3
-	)
 
 	var resp *providers.LLMResponse
 	var err error
@@ -1578,7 +1575,7 @@ func (al *AgentLoop) retryLLMCall(
 			agent.Model,
 			map[string]any{
 				"max_tokens":       agent.MaxTokens,
-				"temperature":      llmTemperature,
+				"temperature":      agent.Temperature,
 				"prompt_cache_key": agent.ID,
 			},
 		)
@@ -1602,7 +1599,6 @@ func (al *AgentLoop) summarizeBatch(
 ) (string, error) {
 	const (
 		llmMaxRetries             = 3
-		llmTemperature            = 0.3
 		fallbackMinContentLength  = 200
 		fallbackMaxContentPercent = 10
 	)

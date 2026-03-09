@@ -141,6 +141,11 @@ func NewAgentInstance(
 		summarizeTokenPercent = 75
 	}
 
+	contextWindow := defaults.ContextWindow
+	if contextWindow == 0 {
+		contextWindow = maxTokens
+	}
+
 	// Resolve fallback candidates
 	modelCfg := providers.ModelConfig{
 		Primary:   model,
@@ -217,7 +222,7 @@ func NewAgentInstance(
 		MaxTokens:                 maxTokens,
 		Temperature:               temperature,
 		ThinkingLevel:             thinkingLevel,
-		ContextWindow:             maxTokens,
+		ContextWindow:             contextWindow,
 		SummarizeMessageThreshold: summarizeMessageThreshold,
 		SummarizeTokenPercent:     summarizeTokenPercent,
 		Provider:                  provider,
