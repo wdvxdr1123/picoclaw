@@ -47,7 +47,11 @@ func (m *MockLLMProvider) GetContextWindow() int {
 func TestSubagentManager_SetLLMOptions_AppliesToRunToolLoop(t *testing.T) {
 	provider := &MockLLMProvider{}
 	manager := NewSubagentManager(provider, "test-model", "/tmp/test")
-	manager.SetLLMOptions(2048, 0.6)
+	manager.SetLLMOptions(map[string]any{
+		"max_tokens":  2048,
+		"temperature": 0.6,
+		"top_p":       0.95,
+	})
 	tool := NewSubagentTool(manager)
 
 	ctx := WithToolContext(context.Background(), "cli", "direct")
@@ -66,6 +70,9 @@ func TestSubagentManager_SetLLMOptions_AppliesToRunToolLoop(t *testing.T) {
 	}
 	if provider.lastOptions["temperature"] != 0.6 {
 		t.Fatalf("temperature = %v, want %v", provider.lastOptions["temperature"], 0.6)
+	}
+	if provider.lastOptions["top_p"] != 0.95 {
+		t.Fatalf("top_p = %v, want %v", provider.lastOptions["top_p"], 0.95)
 	}
 }
 

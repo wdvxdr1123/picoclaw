@@ -1,25 +1,22 @@
-package agent
+package providers
 
 import "testing"
 
-func TestParseThinkingLevel(t *testing.T) {
+func TestNormalizeThinkingLevel(t *testing.T) {
 	tests := []struct {
 		name  string
 		input string
-		want  ThinkingLevel
+		want  string
 	}{
-		{"off", "off", ThinkingOff},
-		{"empty", "", ThinkingOff},
+		{"off", "off", ""},
+		{"empty", "", ""},
 		{"low", "low", ThinkingLow},
 		{"medium", "medium", ThinkingMedium},
 		{"high", "high", ThinkingHigh},
 		{"xhigh", "xhigh", ThinkingXHigh},
-		{"adaptive", "adaptive", ThinkingAdaptive},
-		{"unknown", "unknown", ThinkingOff},
-		// Case-insensitive and whitespace-tolerant
+		{"unknown", "unknown", ""},
 		{"upper_Medium", "Medium", ThinkingMedium},
 		{"upper_HIGH", "HIGH", ThinkingHigh},
-		{"mixed_Adaptive", "Adaptive", ThinkingAdaptive},
 		{"leading_space", " high", ThinkingHigh},
 		{"trailing_space", "low ", ThinkingLow},
 		{"both_spaces", " medium ", ThinkingMedium},
@@ -27,8 +24,8 @@ func TestParseThinkingLevel(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := parseThinkingLevel(tt.input); got != tt.want {
-				t.Errorf("parseThinkingLevel(%q) = %q, want %q", tt.input, got, tt.want)
+			if got := NormalizeThinkingLevel(tt.input); got != tt.want {
+				t.Errorf("NormalizeThinkingLevel(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
 	}

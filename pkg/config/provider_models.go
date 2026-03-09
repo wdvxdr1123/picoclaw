@@ -80,11 +80,7 @@ func (p *ProvidersConfig) SyncNamed() {
 }
 
 func (c *Config) ApplyCompatibilityDefaults() {
-	if strings.TrimSpace(c.DefaultModel) == "" {
-		c.DefaultModel = strings.TrimSpace(c.Agents.Defaults.GetModelName())
-	}
-	if strings.TrimSpace(c.DefaultModel) != "" {
-		c.Agents.Defaults.ModelName = strings.TrimSpace(c.DefaultModel)
+	if strings.TrimSpace(c.Agents.Defaults.GetModelName()) == "" && strings.TrimSpace(c.DefaultModel) != "" {
 		c.Agents.Defaults.Model = strings.TrimSpace(c.DefaultModel)
 	}
 
@@ -99,9 +95,6 @@ func (c *Config) ApplyCompatibilityDefaults() {
 }
 
 func (c *Config) GetDefaultModelName() string {
-	if strings.TrimSpace(c.DefaultModel) != "" {
-		return strings.TrimSpace(c.DefaultModel)
-	}
 	return strings.TrimSpace(c.Agents.Defaults.GetModelName())
 }
 
@@ -155,11 +148,15 @@ func (c *Config) ResolveModelListFromModels() ([]ModelConfig, error) {
 				AuthMethod:     providerCfg.AuthMethod,
 				ConnectMode:    providerCfg.ConnectMode,
 				Workspace:      providerCfg.Workspace,
+				MaxTokens:      variant.MaxTokens,
 				RPM:            variant.RPM,
 				MaxTokensField: variant.MaxTokensField,
 				RequestTimeout: providerCfg.RequestTimeout,
 				MaxContextSize: variant.MaxContextSize,
+				Temperature:    variant.Temperature,
+				TopP:           variant.TopP,
 				ThinkingLevel:  variant.ThinkingLevel,
+				TokenCountAPI:  variant.TokenCountAPI,
 			})
 		}
 	}
@@ -196,10 +193,14 @@ func ConvertModelListToSeparatedConfig(modelList []ModelConfig) (ProvidersConfig
 		models[mc.ModelName] = append(models[mc.ModelName], ModelDefinition{
 			Provider:       providerName,
 			Model:          modelID,
+			MaxTokens:      mc.MaxTokens,
 			RPM:            mc.RPM,
 			MaxTokensField: mc.MaxTokensField,
 			MaxContextSize: mc.MaxContextSize,
+			Temperature:    mc.Temperature,
+			TopP:           mc.TopP,
 			ThinkingLevel:  mc.ThinkingLevel,
+			TokenCountAPI:  mc.TokenCountAPI,
 		})
 	}
 

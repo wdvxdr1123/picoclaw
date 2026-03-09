@@ -152,6 +152,31 @@ func TestProviderChat_ParsesReasoningContent(t *testing.T) {
 	}
 }
 
+func TestProviderChat_SendsTopP(t *testing.T) {
+	var requestBody map[string]any
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{{"message": map[string]any{"content": "ok"}, "finish_reason": "stop"}},
+		})
+	}))
+	defer server.Close()
+
+	p := NewProvider("key", server.URL, "")
+	_, err := p.Chat(t.Context(), []Message{{Role: "user", Content: "hi"}}, nil, "gpt-5.2", map[string]any{"top_p": 0.95})
+	if err != nil {
+		t.Fatalf("Chat() error = %v", err)
+	}
+	if requestBody["top_p"] != 0.95 {
+		t.Fatalf("top_p = %v, want %v", requestBody["top_p"], 0.95)
+	}
+}
+
 func TestProviderChat_PreservesReasoningContentInHistory(t *testing.T) {
 	var requestBody map[string]any
 

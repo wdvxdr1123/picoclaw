@@ -102,6 +102,70 @@ func NewProviderWithMaxTokensFieldAndTimeout(
 	)
 }
 
+func CountTokens(ctx context.Context, apiKey, apiBase, tokenCountAPI, model string, messages []Message) (int, error) {
+	endpoint := resolveTokenCountEndpoint(apiBase, tokenCountAPI)
+	if endpoint == "" {
+		return 0, fmt.Errorf("token count api not configured")
+	}
+
+	requestBody := map[string]any{
+		"model":    model,
+		"messages": serializeMessages(messages),
+	}
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		return 0, fmt.Errorf("failed to marshal token count request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonData))
+	if err != nil {
+		return 0, fmt.Errorf("failed to create token count request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+
+	client := &http.Client{Timeout: defaultRequestTimeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("failed to send token count request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
+		return 0, fmt.Errorf("token count api request failed: status=%d body=%s", resp.StatusCode, responsePreview(body, 128))
+	}
+
+	var out struct {
+		Usage *UsageInfo `json:"usage"`
+
+		PromptTokens int `json:"prompt_tokens"`
+		InputTokens  int `json:"input_tokens"`
+		TotalTokens  int `json:"total_tokens"`
+		Count        int `json:"count"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return 0, fmt.Errorf("failed to decode token count response: %w", err)
+	}
+
+	switch {
+	case out.Usage != nil && out.Usage.PromptTokens > 0:
+		return out.Usage.PromptTokens, nil
+	case out.PromptTokens > 0:
+		return out.PromptTokens, nil
+	case out.InputTokens > 0:
+		return out.InputTokens, nil
+	case out.TotalTokens > 0:
+		return out.TotalTokens, nil
+	case out.Count > 0:
+		return out.Count, nil
+	default:
+		return 0, fmt.Errorf("token count api returned no usable token fields")
+	}
+}
+
 func (p *Provider) Chat(
 	ctx context.Context,
 	messages []Message,
@@ -149,6 +213,10 @@ func (p *Provider) Chat(
 		} else {
 			requestBody["temperature"] = temperature
 		}
+	}
+
+	if topP, ok := asFloat(options["top_p"]); ok {
+		requestBody["top_p"] = topP
 	}
 
 	// Prompt caching: pass a stable cache key so OpenAI can bucket requests
@@ -445,6 +513,25 @@ func normalizeModel(model, apiBase string) string {
 	default:
 		return model
 	}
+}
+
+func resolveTokenCountEndpoint(apiBase, tokenCountAPI string) string {
+	tokenCountAPI = strings.TrimSpace(tokenCountAPI)
+	if tokenCountAPI == "" {
+		return ""
+	}
+	if strings.HasPrefix(tokenCountAPI, "http://") || strings.HasPrefix(tokenCountAPI, "https://") {
+		return tokenCountAPI
+	}
+
+	base := strings.TrimRight(strings.TrimSpace(apiBase), "/")
+	if base == "" {
+		return ""
+	}
+	if strings.HasPrefix(tokenCountAPI, "/") {
+		return base + tokenCountAPI
+	}
+	return base + "/" + tokenCountAPI
 }
 
 func asInt(v any) (int, bool) {

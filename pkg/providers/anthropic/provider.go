@@ -1,10 +1,13 @@
 package anthropicprovider
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
@@ -68,6 +71,56 @@ func NewProviderWithTokenSourceAndBaseURL(token string, tokenSource func() (stri
 	p := NewProviderWithBaseURL(token, apiBase)
 	p.tokenSource = tokenSource
 	return p
+}
+
+func CountTokens(
+	ctx context.Context,
+	token string,
+	apiBase string,
+	messages []Message,
+	model string,
+	options map[string]any,
+) (int, error) {
+	params, err := buildParams(messages, nil, model, options)
+	if err != nil {
+		return 0, err
+	}
+
+	body, err := json.Marshal(params)
+	if err != nil {
+		return 0, fmt.Errorf("marshal count_tokens request: %w", err)
+	}
+
+	baseURL := normalizeBaseURL(apiBase)
+	req, err := http.NewRequestWithContext(ctx, "POST", baseURL+"/v1/messages/count_tokens", bytes.NewReader(body))
+	if err != nil {
+		return 0, fmt.Errorf("create count_tokens request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("anthropic-version", "2023-06-01")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := (&http.Client{}).Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("send count_tokens request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		payload, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
+		return 0, fmt.Errorf("count_tokens request failed: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(payload)))
+	}
+
+	var out struct {
+		InputTokens int `json:"input_tokens"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return 0, fmt.Errorf("decode count_tokens response: %w", err)
+	}
+	if out.InputTokens <= 0 {
+		return 0, fmt.Errorf("count_tokens returned no input_tokens")
+	}
+	return out.InputTokens, nil
 }
 
 func (p *Provider) Chat(
@@ -195,7 +248,7 @@ func buildParams(
 		}
 	}
 
-	maxTokens := int64(4096)
+	maxTokens := int64(16 * 1024)
 	if mt, ok := options["max_tokens"].(int); ok {
 		maxTokens = int64(mt)
 	}
@@ -214,10 +267,6 @@ func buildParams(
 		params.System = system
 	}
 
-	if temp, ok := options["temperature"].(float64); ok {
-		params.Temperature = anthropic.Float(temp)
-	}
-
 	if len(tools) > 0 {
 		params.Tools = translateTools(tools)
 	}
@@ -226,8 +275,15 @@ func buildParams(
 	// The thinking_level value directly determines the API parameter format:
 	//   "adaptive" → {thinking: {type: "adaptive"}} + output_config.effort
 	//   "low/medium/high/xhigh" → {thinking: {type: "enabled", budget_tokens: N}}
-	if level, ok := options["thinking_level"].(string); ok && level != "" && level != "off" {
+	level, ok := options["thinking_level"].(string)
+	if ok && level != "" && level != "off" {
 		applyThinkingConfig(&params, level)
+	}
+	if temp, ok := options["temperature"].(float64); ok && level == "off" { // Anthropic API rejects temperature if thinking is enabled.
+		params.Temperature = anthropic.Float(temp)
+	}
+	if topP, ok := options["top_p"].(float64); ok {
+		params.TopP = anthropic.Float(topP)
 	}
 
 	return params, nil

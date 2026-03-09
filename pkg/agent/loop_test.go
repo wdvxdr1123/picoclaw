@@ -43,7 +43,6 @@ func newTestAgentLoop(
 			Defaults: config.AgentDefaults{
 				Workspace:         tmpDir,
 				Model:             "test-model",
-				MaxTokens:         4096,
 				MaxToolIterations: 10,
 			},
 		},
@@ -102,7 +101,6 @@ func TestNewAgentLoop_StateInitialized(t *testing.T) {
 			Defaults: config.AgentDefaults{
 				Workspace:         tmpDir,
 				Model:             "test-model",
-				MaxTokens:         4096,
 				MaxToolIterations: 10,
 			},
 		},
@@ -138,7 +136,6 @@ func TestToolRegistry_ToolRegistration(t *testing.T) {
 			Defaults: config.AgentDefaults{
 				Workspace:         tmpDir,
 				Model:             "test-model",
-				MaxTokens:         4096,
 				MaxToolIterations: 10,
 			},
 		},
@@ -195,7 +192,6 @@ func TestToolRegistry_GetDefinitions(t *testing.T) {
 			Defaults: config.AgentDefaults{
 				Workspace:         tmpDir,
 				Model:             "test-model",
-				MaxTokens:         4096,
 				MaxToolIterations: 10,
 			},
 		},
@@ -231,7 +227,6 @@ func TestAgentLoop_GetStartupInfo(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Agents.Defaults.Workspace = tmpDir
 	cfg.Agents.Defaults.Model = "test-model"
-	cfg.Agents.Defaults.MaxTokens = 4096
 	cfg.Agents.Defaults.MaxToolIterations = 10
 
 	msgBus := bus.NewMessageBus()
@@ -275,7 +270,6 @@ func TestAgentLoop_Stop(t *testing.T) {
 			Defaults: config.AgentDefaults{
 				Workspace:         tmpDir,
 				Model:             "test-model",
-				MaxTokens:         4096,
 				MaxToolIterations: 10,
 			},
 		},
@@ -395,7 +389,6 @@ func TestProcessMessage_UsesRouteSessionKey(t *testing.T) {
 			Defaults: config.AgentDefaults{
 				Workspace:         tmpDir,
 				Model:             "test-model",
-				MaxTokens:         4096,
 				MaxToolIterations: 10,
 			},
 		},
@@ -451,7 +444,6 @@ func TestProcessMessage_CommandOutcomes(t *testing.T) {
 			Defaults: config.AgentDefaults{
 				Workspace:         tmpDir,
 				Model:             "test-model",
-				MaxTokens:         4096,
 				MaxToolIterations: 10,
 			},
 		},
@@ -531,7 +523,6 @@ func TestProcessMessage_SwitchModelShowModelConsistency(t *testing.T) {
 				Workspace:         tmpDir,
 				Provider:          "openai",
 				Model:             "before-switch",
-				MaxTokens:         4096,
 				MaxToolIterations: 10,
 			},
 		},
@@ -588,7 +579,6 @@ func TestToolResult_SilentToolDoesNotSendUserMessage(t *testing.T) {
 			Defaults: config.AgentDefaults{
 				Workspace:         tmpDir,
 				Model:             "test-model",
-				MaxTokens:         4096,
 				MaxToolIterations: 10,
 			},
 		},
@@ -630,7 +620,6 @@ func TestToolResult_UserFacingToolDoesSendMessage(t *testing.T) {
 			Defaults: config.AgentDefaults{
 				Workspace:         tmpDir,
 				Model:             "test-model",
-				MaxTokens:         4096,
 				MaxToolIterations: 10,
 			},
 		},
@@ -701,7 +690,6 @@ func TestAgentLoop_ContextExhaustionRetry(t *testing.T) {
 			Defaults: config.AgentDefaults{
 				Workspace:         tmpDir,
 				Model:             "test-model",
-				MaxTokens:         4096,
 				MaxToolIterations: 10,
 			},
 		},
@@ -782,7 +770,6 @@ func TestTargetReasoningChannelID_AllChannels(t *testing.T) {
 			Defaults: config.AgentDefaults{
 				Workspace:         tmpDir,
 				Model:             "test-model",
-				MaxTokens:         4096,
 				MaxToolIterations: 10,
 			},
 		},
@@ -852,7 +839,6 @@ func TestHandleReasoning(t *testing.T) {
 				Defaults: config.AgentDefaults{
 					Workspace:         tmpDir,
 					Model:             "test-model",
-					MaxTokens:         4096,
 					MaxToolIterations: 10,
 				},
 			},

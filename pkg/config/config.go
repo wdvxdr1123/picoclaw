@@ -48,7 +48,7 @@ func (f *FlexibleStringSlice) UnmarshalJSON(data []byte) error {
 }
 
 type Config struct {
-	DefaultModel string            `json:"default_model,omitempty"`
+	DefaultModel string            `json:"default_model,omitempty"` // Deprecated compatibility input only
 	LoopControl  LoopControlConfig `json:"loop_control,omitempty"`
 	Agents       AgentsConfig      `json:"agents"`
 	Bindings     []AgentBinding    `json:"bindings,omitempty"`
@@ -67,30 +67,28 @@ type Config struct {
 // to omit providers/session when empty and prefer the new models layout.
 func (c Config) MarshalJSON() ([]byte, error) {
 	type marshaledConfig struct {
-		DefaultModel string             `json:"default_model,omitempty"`
-		LoopControl  *LoopControlConfig `json:"loop_control,omitempty"`
-		Agents       AgentsConfig       `json:"agents"`
-		Bindings     []AgentBinding     `json:"bindings,omitempty"`
-		Session      *SessionConfig     `json:"session,omitempty"`
-		Channels     ChannelsConfig     `json:"channels"`
-		Providers    *ProvidersConfig   `json:"providers,omitempty"`
-		Models       ModelsConfig       `json:"models,omitempty"`
-		ModelList    []ModelConfig      `json:"model_list,omitempty"`
-		Gateway      GatewayConfig      `json:"gateway"`
-		Tools        ToolsConfig        `json:"tools"`
-		Heartbeat    HeartbeatConfig    `json:"heartbeat"`
-		Devices      DevicesConfig      `json:"devices"`
+		LoopControl *LoopControlConfig `json:"loop_control,omitempty"`
+		Agents      AgentsConfig       `json:"agents"`
+		Bindings    []AgentBinding     `json:"bindings,omitempty"`
+		Session     *SessionConfig     `json:"session,omitempty"`
+		Channels    ChannelsConfig     `json:"channels"`
+		Providers   *ProvidersConfig   `json:"providers,omitempty"`
+		Models      ModelsConfig       `json:"models,omitempty"`
+		ModelList   []ModelConfig      `json:"model_list,omitempty"`
+		Gateway     GatewayConfig      `json:"gateway"`
+		Tools       ToolsConfig        `json:"tools"`
+		Heartbeat   HeartbeatConfig    `json:"heartbeat"`
+		Devices     DevicesConfig      `json:"devices"`
 	}
 
 	out := marshaledConfig{
-		DefaultModel: c.DefaultModel,
-		Agents:       c.Agents,
-		Bindings:     c.Bindings,
-		Channels:     c.Channels,
-		Gateway:      c.Gateway,
-		Tools:        c.Tools,
-		Heartbeat:    c.Heartbeat,
-		Devices:      c.Devices,
+		Agents:    c.Agents,
+		Bindings:  c.Bindings,
+		Channels:  c.Channels,
+		Gateway:   c.Gateway,
+		Tools:     c.Tools,
+		Heartbeat: c.Heartbeat,
+		Devices:   c.Devices,
 	}
 
 	if !c.LoopControl.IsEmpty() {
@@ -222,20 +220,43 @@ type AgentDefaults struct {
 	Workspace                 string         `json:"workspace"                       env:"PICOCLAW_AGENTS_DEFAULTS_WORKSPACE"`
 	RestrictToWorkspace       bool           `json:"restrict_to_workspace"           env:"PICOCLAW_AGENTS_DEFAULTS_RESTRICT_TO_WORKSPACE"`
 	AllowReadOutsideWorkspace bool           `json:"allow_read_outside_workspace"    env:"PICOCLAW_AGENTS_DEFAULTS_ALLOW_READ_OUTSIDE_WORKSPACE"`
-	Provider                  string         `json:"provider"                        env:"PICOCLAW_AGENTS_DEFAULTS_PROVIDER"`
+	Provider                  string         `json:"provider,omitempty"              env:"PICOCLAW_AGENTS_DEFAULTS_PROVIDER"`
 	ModelName                 string         `json:"model_name,omitempty"            env:"PICOCLAW_AGENTS_DEFAULTS_MODEL_NAME"`
-	Model                     string         `json:"model"                           env:"PICOCLAW_AGENTS_DEFAULTS_MODEL"` // Deprecated: use model_name instead
-	ModelFallbacks            []string       `json:"model_fallbacks,omitempty"`
+	Model                     string         `json:"model,omitempty"                 env:"PICOCLAW_AGENTS_DEFAULTS_MODEL"` // Primary model alias selected by this agent
+	ModelFallbacks            []string       `json:"model_fallbacks,omitempty"`                                            // Deprecated: use agent.model or models config instead
 	ImageModel                string         `json:"image_model,omitempty"           env:"PICOCLAW_AGENTS_DEFAULTS_IMAGE_MODEL"`
 	ImageModelFallbacks       []string       `json:"image_model_fallbacks,omitempty"`
-	MaxTokens                 int            `json:"max_tokens"                      env:"PICOCLAW_AGENTS_DEFAULTS_MAX_TOKENS"`
-	ContextWindow             int            `json:"context_window"                  env:"PICOCLAW_AGENTS_DEFAULTS_CONTEXT_WINDOW"`
-	Temperature               *float64       `json:"temperature,omitempty"           env:"PICOCLAW_AGENTS_DEFAULTS_TEMPERATURE"`
-	MaxToolIterations         int            `json:"max_tool_iterations"             env:"PICOCLAW_AGENTS_DEFAULTS_MAX_TOOL_ITERATIONS"`
+	MaxToolIterations         int            `json:"max_tool_iterations,omitempty"   env:"PICOCLAW_AGENTS_DEFAULTS_MAX_TOOL_ITERATIONS"` // Deprecated: use loop_control.max_steps_per_turn
 	SummarizeMessageThreshold int            `json:"summarize_message_threshold"     env:"PICOCLAW_AGENTS_DEFAULTS_SUMMARIZE_MESSAGE_THRESHOLD"`
 	SummarizeTokenPercent     int            `json:"summarize_token_percent"         env:"PICOCLAW_AGENTS_DEFAULTS_SUMMARIZE_TOKEN_PERCENT"`
 	MaxMediaSize              int            `json:"max_media_size,omitempty"        env:"PICOCLAW_AGENTS_DEFAULTS_MAX_MEDIA_SIZE"`
 	Routing                   *RoutingConfig `json:"routing,omitempty"`
+}
+
+// MarshalJSON keeps legacy agent defaults readable on input but omits fields
+// that are no longer valid in the new config layout when saving config.
+func (d AgentDefaults) MarshalJSON() ([]byte, error) {
+	type visible struct {
+		Workspace                 string         `json:"workspace,omitempty"`
+		RestrictToWorkspace       bool           `json:"restrict_to_workspace,omitempty"`
+		AllowReadOutsideWorkspace bool           `json:"allow_read_outside_workspace,omitempty"`
+		Model                     string         `json:"model,omitempty"`
+		SummarizeMessageThreshold int            `json:"summarize_message_threshold,omitempty"`
+		SummarizeTokenPercent     int            `json:"summarize_token_percent,omitempty"`
+		MaxMediaSize              int            `json:"max_media_size,omitempty"`
+		Routing                   *RoutingConfig `json:"routing,omitempty"`
+	}
+
+	return json.Marshal(visible{
+		Workspace:                 d.Workspace,
+		RestrictToWorkspace:       d.RestrictToWorkspace,
+		AllowReadOutsideWorkspace: d.AllowReadOutsideWorkspace,
+		Model:                     d.GetModelName(),
+		SummarizeMessageThreshold: d.SummarizeMessageThreshold,
+		SummarizeTokenPercent:     d.SummarizeTokenPercent,
+		MaxMediaSize:              d.MaxMediaSize,
+		Routing:                   d.Routing,
+	})
 }
 
 const DefaultMaxMediaSize = 20 * 1024 * 1024 // 20 MB
@@ -644,9 +665,13 @@ type ModelDefinition struct {
 	Provider       string   `json:"provider"`
 	Model          string   `json:"model"`
 	RPM            int      `json:"rpm,omitempty"`
+	MaxTokens      int      `json:"max_tokens,omitempty"`
 	MaxTokensField string   `json:"max_tokens_field,omitempty"`
 	MaxContextSize int      `json:"max_context_size,omitempty"`
+	Temperature    *float64 `json:"temperature,omitempty"`
+	TopP           *float64 `json:"top_p,omitempty"`
 	ThinkingLevel  string   `json:"thinking_level,omitempty"`
+	TokenCountAPI  string   `json:"token_count_api,omitempty"`
 	Capabilities   []string `json:"capabilities,omitempty"`
 }
 
@@ -668,11 +693,15 @@ type ModelConfig struct {
 	Workspace   string `json:"workspace,omitempty"`    // Workspace path for CLI-based providers
 
 	// Optional optimizations
-	RPM            int    `json:"rpm,omitempty"`              // Requests per minute limit
-	MaxTokensField string `json:"max_tokens_field,omitempty"` // Field name for max tokens (e.g., "max_completion_tokens")
-	RequestTimeout int    `json:"request_timeout,omitempty"`
-	MaxContextSize int    `json:"max_context_size,omitempty"`
-	ThinkingLevel  string `json:"thinking_level,omitempty"` // Extended thinking: off|low|medium|high|xhigh|adaptive
+	MaxTokens      int      `json:"max_tokens,omitempty"`
+	RPM            int      `json:"rpm,omitempty"`              // Requests per minute limit
+	MaxTokensField string   `json:"max_tokens_field,omitempty"` // Field name for max tokens (e.g., "max_completion_tokens")
+	RequestTimeout int      `json:"request_timeout,omitempty"`
+	MaxContextSize int      `json:"max_context_size,omitempty"`
+	Temperature    *float64 `json:"temperature,omitempty"`
+	TopP           *float64 `json:"top_p,omitempty"`
+	ThinkingLevel  string   `json:"thinking_level,omitempty"` // Extended thinking: off|low|medium|high|xhigh|adaptive
+	TokenCountAPI  string   `json:"token_count_api,omitempty"`
 }
 
 // Validate checks if the ModelConfig has all required fields.

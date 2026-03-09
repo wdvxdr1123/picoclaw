@@ -24,13 +24,10 @@ type AgentInstance struct {
 	Fallbacks                 []string
 	Workspace                 string
 	MaxIterations             int
-	MaxTokens                 int
-	Temperature               float64
-	ThinkingLevel             ThinkingLevel
-	ContextWindow             int
 	SummarizeMessageThreshold int
 	SummarizeTokenPercent     int
 	Provider                  providers.LLMProvider
+	ResolvedModelConfig       *config.ModelConfig
 	Sessions                  *session.SessionManager
 	ContextBuilder            *ContextBuilder
 	Tools                     *tools.ToolRegistry
@@ -110,48 +107,27 @@ func NewAgentInstance(
 		skillsFilter = agentCfg.Skills
 	}
 
-	maxIter := defaults.MaxToolIterations
+	maxIter := cfg.LoopControl.MaxStepsPerTurn
+	if maxIter == 0 {
+		maxIter = defaults.MaxToolIterations
+	}
 	if maxIter == 0 {
 		maxIter = 20
 	}
 
-	maxTokens := defaults.MaxTokens
-	if maxTokens == 0 {
-		maxTokens = 8192
-	}
-
-	temperature := 0.7
-	if defaults.Temperature != nil {
-		temperature = *defaults.Temperature
-	}
-
-	var (
-		thinkingLevelStr string
-		maxContextSize   int
-	)
+	var modelResolved *config.ModelConfig
 	if mc, err := cfg.GetModelConfig(model); err == nil {
-		thinkingLevelStr = mc.ThinkingLevel
-		maxContextSize = mc.MaxContextSize
+		modelResolved = mc
 	}
-	thinkingLevel := parseThinkingLevel(thinkingLevelStr)
 
 	summarizeMessageThreshold := defaults.SummarizeMessageThreshold
 	if summarizeMessageThreshold == 0 {
-		summarizeMessageThreshold = 20
+		summarizeMessageThreshold = 30
 	}
 
 	summarizeTokenPercent := defaults.SummarizeTokenPercent
 	if summarizeTokenPercent == 0 {
 		summarizeTokenPercent = 75
-	}
-
-	contextWindow := defaults.ContextWindow
-	if contextWindow == 0 {
-		if maxContextSize > 0 {
-			contextWindow = maxContextSize
-		} else {
-			contextWindow = maxTokens
-		}
 	}
 
 	// Resolve fallback candidates
@@ -227,13 +203,10 @@ func NewAgentInstance(
 		Fallbacks:                 fallbacks,
 		Workspace:                 workspace,
 		MaxIterations:             maxIter,
-		MaxTokens:                 maxTokens,
-		Temperature:               temperature,
-		ThinkingLevel:             thinkingLevel,
-		ContextWindow:             contextWindow,
 		SummarizeMessageThreshold: summarizeMessageThreshold,
 		SummarizeTokenPercent:     summarizeTokenPercent,
 		Provider:                  provider,
+		ResolvedModelConfig:       modelResolved,
 		Sessions:                  sessionsManager,
 		ContextBuilder:            contextBuilder,
 		Tools:                     toolsRegistry,

@@ -1,5 +1,4 @@
 {
-  "default_model": "gpt4",
   "loop_control": {
     "max_steps_per_turn": 20
   },
@@ -7,10 +6,9 @@
     "defaults": {
       "workspace": "~/.picoclaw/workspace",
       "restrict_to_workspace": true,
-      "max_tokens": 8192,
-      "temperature": 0.7,
-      "summarize_message_threshold": 20,
-      "summarize_token_percent": 75
+      "model": "gpt4",
+      "summarize_message_threshold": 30,
+      "summarize_token_percent": 80
     }
   },
   "providers": {
@@ -48,7 +46,10 @@
   "models": {
     "gpt4": {
       "provider": "openai",
-      "model": "gpt-5.2"
+      "model": "gpt-5.2",
+      "max_tokens": 8192,
+      "temperature": 1.0,
+      "top_p": 0.95
     },
     "claude-sonnet-4.6": {
       "provider": "anthropic",

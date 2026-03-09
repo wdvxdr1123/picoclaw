@@ -24,7 +24,6 @@ func DefaultConfig() *Config {
 	workspacePath := filepath.Join(homePath, "workspace")
 
 	cfg := &Config{
-		DefaultModel: "",
 		LoopControl: LoopControlConfig{
 			MaxStepsPerTurn: 50,
 		},
@@ -34,8 +33,6 @@ func DefaultConfig() *Config {
 				RestrictToWorkspace:       true,
 				Provider:                  "",
 				Model:                     "",
-				MaxTokens:                 32768,
-				Temperature:               nil, // nil means use provider default
 				MaxToolIterations:         50,
 				SummarizeMessageThreshold: 20,
 				SummarizeTokenPercent:     75,

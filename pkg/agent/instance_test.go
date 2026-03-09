@@ -5,70 +5,77 @@ import (
 	"testing"
 
 	"github.com/sipeed/picoclaw/pkg/config"
+	"github.com/sipeed/picoclaw/pkg/providers"
 )
 
-func TestNewAgentInstance_UsesDefaultsTemperatureAndMaxTokens(t *testing.T) {
+func TestNewAgentInstance_UsesModelGenerationSettings(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "agent-instance-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-
-	cfg := &config.Config{
-		Agents: config.AgentsConfig{
-			Defaults: config.AgentDefaults{
-				Workspace:         tmpDir,
-				Model:             "test-model",
-				MaxTokens:         1234,
-				MaxToolIterations: 5,
-			},
-		},
-	}
 
 	configuredTemp := 1.0
-	cfg.Agents.Defaults.Temperature = &configuredTemp
-
-	provider := &mockProvider{}
-	agent := NewAgentInstance(nil, &cfg.Agents.Defaults, cfg, provider)
-
-	if agent.MaxTokens != 1234 {
-		t.Fatalf("MaxTokens = %d, want %d", agent.MaxTokens, 1234)
-	}
-	if agent.Temperature != 1.0 {
-		t.Fatalf("Temperature = %f, want %f", agent.Temperature, 1.0)
-	}
-}
-
-func TestNewAgentInstance_DefaultsTemperatureWhenZero(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "agent-instance-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
 	cfg := &config.Config{
 		Agents: config.AgentsConfig{
 			Defaults: config.AgentDefaults{
 				Workspace:         tmpDir,
 				Model:             "test-model",
-				MaxTokens:         1234,
 				MaxToolIterations: 5,
 			},
 		},
+		ModelList: []config.ModelConfig{{
+			ModelName:   "test-model",
+			Model:       "openai/gpt-5.2",
+			MaxTokens:   1234,
+			Temperature: &configuredTemp,
+		}},
 	}
+
+	provider := &mockProvider{}
+	agent := NewAgentInstance(nil, &cfg.Agents.Defaults, cfg, provider)
+
+	if providers.EffectiveMaxTokens(agent.ResolvedModelConfig) != 1234 {
+		t.Fatalf("EffectiveMaxTokens = %d, want %d", providers.EffectiveMaxTokens(agent.ResolvedModelConfig), 1234)
+	}
+	if temp, ok := providers.EffectiveTemperature(agent.ResolvedModelConfig); !ok || temp != 1.0 {
+		t.Fatalf("EffectiveTemperature = (%v, %v), want (1.0, true)", temp, ok)
+	}
+}
+
+func TestNewAgentInstance_UsesModelTemperatureWhenZero(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "agent-instance-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 
 	configuredTemp := 0.0
-	cfg.Agents.Defaults.Temperature = &configuredTemp
+	cfg := &config.Config{
+		Agents: config.AgentsConfig{
+			Defaults: config.AgentDefaults{
+				Workspace:         tmpDir,
+				Model:             "test-model",
+				MaxToolIterations: 5,
+			},
+		},
+		ModelList: []config.ModelConfig{{
+			ModelName:   "test-model",
+			Model:       "openai/gpt-5.2",
+			MaxTokens:   1234,
+			Temperature: &configuredTemp,
+		}},
+	}
 
 	provider := &mockProvider{}
 	agent := NewAgentInstance(nil, &cfg.Agents.Defaults, cfg, provider)
 
-	if agent.Temperature != 0.0 {
-		t.Fatalf("Temperature = %f, want %f", agent.Temperature, 0.0)
+	if temp, ok := providers.EffectiveTemperature(agent.ResolvedModelConfig); !ok || temp != 0.0 {
+		t.Fatalf("EffectiveTemperature = (%v, %v), want (0.0, true)", temp, ok)
 	}
 }
 
-func TestNewAgentInstance_DefaultsTemperatureWhenUnset(t *testing.T) {
+func TestNewAgentInstance_DefaultsTopPWhenUnset(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "agent-instance-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
@@ -80,17 +87,24 @@ func TestNewAgentInstance_DefaultsTemperatureWhenUnset(t *testing.T) {
 			Defaults: config.AgentDefaults{
 				Workspace:         tmpDir,
 				Model:             "test-model",
-				MaxTokens:         1234,
 				MaxToolIterations: 5,
 			},
 		},
+		ModelList: []config.ModelConfig{{
+			ModelName: "test-model",
+			Model:     "openai/gpt-5.2",
+			MaxTokens: 1234,
+		}},
 	}
 
 	provider := &mockProvider{}
 	agent := NewAgentInstance(nil, &cfg.Agents.Defaults, cfg, provider)
 
-	if agent.Temperature != 0.7 {
-		t.Fatalf("Temperature = %f, want %f", agent.Temperature, 0.7)
+	if providers.EffectiveTopP(agent.ResolvedModelConfig) != 0.95 {
+		t.Fatalf("EffectiveTopP = %f, want %f", providers.EffectiveTopP(agent.ResolvedModelConfig), 0.95)
+	}
+	if _, ok := providers.EffectiveTemperature(agent.ResolvedModelConfig); ok {
+		t.Fatal("EffectiveTemperature should be unset when model temperature is not configured")
 	}
 }
 
@@ -158,5 +172,77 @@ func TestNewAgentInstance_ResolveCandidatesFromModelListAlias(t *testing.T) {
 				t.Fatalf("candidate model = %q, want %q", agent.Candidates[0].Model, tt.wantModel)
 			}
 		})
+	}
+}
+
+func TestNewAgentInstance_PrefersModelConfigForGenerationSettings(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "agent-instance-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	modelTemp := 0.15
+	cfg := &config.Config{
+		Agents: config.AgentsConfig{
+			Defaults: config.AgentDefaults{
+				Workspace:         tmpDir,
+				Model:             "coder",
+				MaxToolIterations: 5,
+			},
+		},
+		ModelList: []config.ModelConfig{
+			{
+				ModelName:      "coder",
+				Model:          "openai/gpt-5.2",
+				MaxTokens:      4096,
+				Temperature:    &modelTemp,
+				MaxContextSize: 200000,
+			},
+		},
+	}
+
+	provider := &mockProvider{}
+	agent := NewAgentInstance(nil, &cfg.Agents.Defaults, cfg, provider)
+
+	if providers.EffectiveMaxTokens(agent.ResolvedModelConfig) != 4096 {
+		t.Fatalf("EffectiveMaxTokens = %d, want %d", providers.EffectiveMaxTokens(agent.ResolvedModelConfig), 4096)
+	}
+	if temp, ok := providers.EffectiveTemperature(agent.ResolvedModelConfig); !ok || temp != 0.15 {
+		t.Fatalf("EffectiveTemperature = (%v, %v), want (0.15, true)", temp, ok)
+	}
+	if providers.EffectiveContextWindow(agent.ResolvedModelConfig) != 200000 {
+		t.Fatalf("EffectiveContextWindow = %d, want %d", providers.EffectiveContextWindow(agent.ResolvedModelConfig), 200000)
+	}
+	if agent.ResolvedModelConfig == nil {
+		t.Fatal("ResolvedModelConfig should not be nil")
+	}
+}
+
+func TestNewAgentInstance_PrefersLoopControlOverLegacyMaxIterations(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "agent-instance-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	cfg := &config.Config{
+		LoopControl: config.LoopControlConfig{
+			MaxStepsPerTurn: 7,
+		},
+		Agents: config.AgentsConfig{
+			Defaults: config.AgentDefaults{
+				Workspace:         tmpDir,
+				Model:             "test-model",
+				MaxToolIterations: 99,
+			},
+		},
+	}
+
+	provider := &mockProvider{}
+	agent := NewAgentInstance(nil, &cfg.Agents.Defaults, cfg, provider)
+
+	if agent.MaxIterations != 7 {
+		t.Fatalf("MaxIterations = %d, want %d", agent.MaxIterations, 7)
 	}
 }

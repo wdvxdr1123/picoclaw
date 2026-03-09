@@ -34,8 +34,8 @@ func agentCmd(message, sessionKey, model string, debug bool) error {
 	}
 
 	if model != "" {
-		cfg.DefaultModel = model
-		cfg.Agents.Defaults.ModelName = model
+		cfg.Agents.Defaults.Model = model
+		cfg.Agents.Defaults.ModelName = ""
 	}
 
 	provider, modelID, err := providers.CreateProvider(cfg)
@@ -45,8 +45,8 @@ func agentCmd(message, sessionKey, model string, debug bool) error {
 
 	// Use the resolved model ID from provider creation
 	if modelID != "" {
-		cfg.DefaultModel = modelID
-		cfg.Agents.Defaults.ModelName = modelID
+		cfg.Agents.Defaults.Model = modelID
+		cfg.Agents.Defaults.ModelName = ""
 	}
 
 	msgBus := bus.NewMessageBus()

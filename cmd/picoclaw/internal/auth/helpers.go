@@ -356,6 +356,6 @@ func ensureNamedModel(appCfg *config.Config, alias, provider, model string) {
 }
 
 func setDefaultModel(appCfg *config.Config, alias string) {
-	appCfg.DefaultModel = alias
-	appCfg.Agents.Defaults.ModelName = alias
+	appCfg.Agents.Defaults.Model = alias
+	appCfg.Agents.Defaults.ModelName = ""
 }

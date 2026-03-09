@@ -223,16 +223,14 @@ picoclaw onboard
 
 ```json
 {
-  "default_model": "gpt4",
   "loop_control": {
     "max_steps_per_turn": 20
   },
   "agents": {
     "defaults": {
       "workspace": "~/.picoclaw/workspace",
-      "max_tokens": 8192,
-      "temperature": 0.7,
-      "restrict_to_workspace": true
+      "restrict_to_workspace": true,
+      "model": "gpt4"
     }
   },
   "providers": {
@@ -249,7 +247,10 @@ picoclaw onboard
   "models": {
     "gpt4": {
       "provider": "openai",
-      "model": "gpt-5.2"
+      "model": "gpt-5.2",
+      "max_tokens": 8192,
+      "temperature": 0.7,
+      "token_count_api": "/tokenize"
     },
     "claude-sonnet-4.6": {
       "provider": "anthropic",
@@ -534,7 +535,11 @@ Agent 读取 HEARTBEAT.md
 
 ```json
 {
-  "default_model": "gpt-5.2",
+  "agents": {
+    "defaults": {
+      "model": "gpt-5.2"
+    }
+  },
   "providers": {
     "openai": {
       "type": "openai",
@@ -691,7 +696,11 @@ Agent 读取 HEARTBEAT.md
 
 ```json
 {
-  "default_model": "glm-4.7",
+  "agents": {
+    "defaults": {
+      "model": "glm-4.7"
+    }
+  },
   "providers": {
     "zhipu": {
       "type": "zhipu",

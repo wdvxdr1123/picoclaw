@@ -52,6 +52,19 @@ func TestBuildParams_SystemMessage(t *testing.T) {
 	}
 }
 
+func TestBuildParams_TopP(t *testing.T) {
+	params, err := buildParams([]Message{{Role: "user", Content: "hi"}}, nil, "claude-sonnet-4.6", map[string]any{
+		"top_p":      0.95,
+		"max_tokens": 1024,
+	})
+	if err != nil {
+		t.Fatalf("buildParams() error: %v", err)
+	}
+	if !params.TopP.Valid() || params.TopP.Value != 0.95 {
+		t.Fatalf("TopP = %v, want 0.95", params.TopP)
+	}
+}
+
 func TestBuildParams_ToolCallMessage(t *testing.T) {
 	messages := []Message{
 		{Role: "user", Content: "What's the weather?"},

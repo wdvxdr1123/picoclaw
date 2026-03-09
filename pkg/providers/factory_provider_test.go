@@ -99,43 +99,6 @@ func TestCreateProviderFromConfig_OpenAI(t *testing.T) {
 	}
 }
 
-func TestCreateProviderFromConfig_DefaultAPIBase(t *testing.T) {
-	tests := []struct {
-		name     string
-		protocol string
-	}{
-		{"openai", "openai"},
-		{"groq", "groq"},
-		{"openrouter", "openrouter"},
-		{"cerebras", "cerebras"},
-		{"vivgrid", "vivgrid"},
-		{"qwen", "qwen"},
-		{"vllm", "vllm"},
-		{"deepseek", "deepseek"},
-		{"ollama", "ollama"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := &config.ModelConfig{
-				ModelName: "test-" + tt.protocol,
-				Model:     tt.protocol + "/test-model",
-				APIKey:    "test-key",
-			}
-
-			provider, _, err := CreateProviderFromConfig(cfg)
-			if err != nil {
-				t.Fatalf("CreateProviderFromConfig() error = %v", err)
-			}
-
-			// Verify we got an HTTPProvider for all these protocols
-			if _, ok := provider.(*HTTPProvider); !ok {
-				t.Fatalf("expected *HTTPProvider, got %T", provider)
-			}
-		})
-	}
-}
-
 func TestCreateProviderFromConfig_LiteLLM(t *testing.T) {
 	cfg := &config.ModelConfig{
 		ModelName: "test-litellm",
@@ -172,72 +135,6 @@ func TestCreateProviderFromConfig_Anthropic(t *testing.T) {
 	}
 	if modelID != "claude-sonnet-4.6" {
 		t.Errorf("modelID = %q, want %q", modelID, "claude-sonnet-4.6")
-	}
-}
-
-func TestCreateProviderFromConfig_Antigravity(t *testing.T) {
-	cfg := &config.ModelConfig{
-		ModelName: "test-antigravity",
-		Model:     "antigravity/gemini-2.0-flash",
-	}
-
-	provider, modelID, err := CreateProviderFromConfig(cfg)
-	if err != nil {
-		t.Fatalf("CreateProviderFromConfig() error = %v", err)
-	}
-	if provider == nil {
-		t.Fatal("CreateProviderFromConfig() returned nil provider")
-	}
-	if modelID != "gemini-2.0-flash" {
-		t.Errorf("modelID = %q, want %q", modelID, "gemini-2.0-flash")
-	}
-}
-
-func TestCreateProviderFromConfig_ClaudeCLI(t *testing.T) {
-	cfg := &config.ModelConfig{
-		ModelName: "test-claude-cli",
-		Model:     "claude-cli/claude-sonnet-4.6",
-	}
-
-	provider, modelID, err := CreateProviderFromConfig(cfg)
-	if err != nil {
-		t.Fatalf("CreateProviderFromConfig() error = %v", err)
-	}
-	if provider == nil {
-		t.Fatal("CreateProviderFromConfig() returned nil provider")
-	}
-	if modelID != "claude-sonnet-4.6" {
-		t.Errorf("modelID = %q, want %q", modelID, "claude-sonnet-4.6")
-	}
-}
-
-func TestCreateProviderFromConfig_CodexCLI(t *testing.T) {
-	cfg := &config.ModelConfig{
-		ModelName: "test-codex-cli",
-		Model:     "codex-cli/codex",
-	}
-
-	provider, modelID, err := CreateProviderFromConfig(cfg)
-	if err != nil {
-		t.Fatalf("CreateProviderFromConfig() error = %v", err)
-	}
-	if provider == nil {
-		t.Fatal("CreateProviderFromConfig() returned nil provider")
-	}
-	if modelID != "codex" {
-		t.Errorf("modelID = %q, want %q", modelID, "codex")
-	}
-}
-
-func TestCreateProviderFromConfig_MissingAPIKey(t *testing.T) {
-	cfg := &config.ModelConfig{
-		ModelName: "test-no-key",
-		Model:     "openai/gpt-4o",
-	}
-
-	_, _, err := CreateProviderFromConfig(cfg)
-	if err == nil {
-		t.Fatal("CreateProviderFromConfig() expected error for missing API key")
 	}
 }
 

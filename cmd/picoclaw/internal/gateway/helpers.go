@@ -48,7 +48,8 @@ func gatewayCmd(debug bool) error {
 
 	// Use the resolved model ID from provider creation
 	if modelID != "" {
-		cfg.Agents.Defaults.ModelName = modelID
+		cfg.Agents.Defaults.Model = modelID
+		cfg.Agents.Defaults.ModelName = ""
 	}
 
 	msgBus := bus.NewMessageBus()

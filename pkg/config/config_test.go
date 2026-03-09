@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 )
 
@@ -216,30 +215,12 @@ func TestDefaultConfig_Model(t *testing.T) {
 	}
 }
 
-// TestDefaultConfig_MaxTokens verifies max tokens has default value
-func TestDefaultConfig_MaxTokens(t *testing.T) {
-	cfg := DefaultConfig()
-
-	if cfg.Agents.Defaults.MaxTokens == 0 {
-		t.Error("MaxTokens should not be zero")
-	}
-}
-
 // TestDefaultConfig_MaxToolIterations verifies max tool iterations has default value
 func TestDefaultConfig_MaxToolIterations(t *testing.T) {
 	cfg := DefaultConfig()
 
 	if cfg.Agents.Defaults.MaxToolIterations == 0 {
 		t.Error("MaxToolIterations should not be zero")
-	}
-}
-
-// TestDefaultConfig_Temperature verifies temperature has default value
-func TestDefaultConfig_Temperature(t *testing.T) {
-	cfg := DefaultConfig()
-
-	if cfg.Agents.Defaults.Temperature != nil {
-		t.Error("Temperature should be nil when not provided")
 	}
 }
 
@@ -319,11 +300,14 @@ func TestSaveConfig_FilePermissions(t *testing.T) {
 	}
 }
 
-func TestSaveConfig_IncludesEmptyLegacyModelField(t *testing.T) {
+func TestSaveConfig_OmitsLegacyAgentFields(t *testing.T) {
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "config.json")
 
 	cfg := DefaultConfig()
+	cfg.Agents.Defaults.Model = "legacy-model"
+	cfg.Agents.Defaults.ModelName = "legacy-model-name"
+	cfg.Agents.Defaults.MaxToolIterations = 20
 	if err := SaveConfig(path, cfg); err != nil {
 		t.Fatalf("SaveConfig failed: %v", err)
 	}
@@ -333,8 +317,31 @@ func TestSaveConfig_IncludesEmptyLegacyModelField(t *testing.T) {
 		t.Fatalf("ReadFile failed: %v", err)
 	}
 
-	if !strings.Contains(string(data), `"model": ""`) {
-		t.Fatalf("saved config should include empty legacy model field, got: %s", string(data))
+	content := string(data)
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal() error: %v", err)
+	}
+	agents, ok := decoded["agents"].(map[string]any)
+	if !ok {
+		t.Fatalf("agents missing in saved config: %s", content)
+	}
+	defaults, ok := agents["defaults"].(map[string]any)
+	if !ok {
+		t.Fatalf("agents.defaults missing in saved config: %s", content)
+	}
+
+	for _, legacyKey := range []string{
+		"model_name",
+		"provider",
+		"max_tool_iterations",
+	} {
+		if _, exists := defaults[legacyKey]; exists {
+			t.Fatalf("saved config should omit legacy agent field %s, got defaults=%v", legacyKey, defaults)
+		}
+	}
+	if defaults["model"] != "legacy-model-name" {
+		t.Fatalf("saved config should keep agents.defaults.model, got defaults=%v", defaults)
 	}
 }
 
@@ -347,12 +354,6 @@ func TestConfig_Complete(t *testing.T) {
 	}
 	if cfg.Agents.Defaults.Model != "" {
 		t.Error("Model should be empty")
-	}
-	if cfg.Agents.Defaults.Temperature != nil {
-		t.Error("Temperature should be nil when not provided")
-	}
-	if cfg.Agents.Defaults.MaxTokens == 0 {
-		t.Error("MaxTokens should not be zero")
 	}
 	if cfg.Agents.Defaults.MaxToolIterations == 0 {
 		t.Error("MaxToolIterations should not be zero")

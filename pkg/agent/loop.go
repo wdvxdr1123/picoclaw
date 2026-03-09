@@ -213,7 +213,9 @@ func registerSharedTools(
 		if cfg.Tools.IsToolEnabled("spawn") {
 			if cfg.Tools.IsToolEnabled("subagent") {
 				subagentManager := tools.NewSubagentManager(provider, agent.Model, agent.Workspace)
-				subagentManager.SetLLMOptions(agent.MaxTokens, agent.Temperature)
+				subagentManager.SetLLMOptions(
+					providers.BuildLLMOptions(agent.ResolvedModelConfig, "", agent.Provider),
+				)
 				spawnTool := tools.NewSpawnTool(subagentManager)
 				currentAgentID := agentID
 				spawnTool.SetAllowlistChecker(func(targetAgentID string) bool {
@@ -893,8 +895,8 @@ func (al *AgentLoop) runLLMIteration(
 				"model":             activeModel,
 				"messages_count":    len(messages),
 				"tools_count":       len(providerToolDefs),
-				"max_tokens":        agent.MaxTokens,
-				"temperature":       agent.Temperature,
+				"max_tokens":        providers.EffectiveMaxTokens(agent.ResolvedModelConfig),
+				"top_p":             providers.EffectiveTopP(agent.ResolvedModelConfig),
 				"system_prompt_len": len(messages[0].Content),
 			})
 
@@ -910,19 +912,11 @@ func (al *AgentLoop) runLLMIteration(
 		var response *providers.LLMResponse
 		var err error
 
-		llmOpts := map[string]any{
-			"max_tokens":       agent.MaxTokens,
-			"temperature":      agent.Temperature,
-			"prompt_cache_key": agent.ID,
-		}
-		// parseThinkingLevel guarantees ThinkingOff for empty/unknown values,
-		// so checking != ThinkingOff is sufficient.
-		if agent.ThinkingLevel != ThinkingOff {
-			if tc, ok := agent.Provider.(providers.ThinkingCapable); ok && tc.SupportsThinking() {
-				llmOpts["thinking_level"] = string(agent.ThinkingLevel)
-			} else {
+		llmOpts := providers.BuildLLMOptions(agent.ResolvedModelConfig, agent.ID, agent.Provider)
+		if level := providers.EffectiveThinkingLevel(agent.ResolvedModelConfig); level != "" {
+			if _, ok := llmOpts["thinking_level"]; !ok {
 				logger.WarnCF("agent", "thinking_level is set but current provider does not support it, ignoring",
-					map[string]any{"agent_id": agent.ID, "thinking_level": string(agent.ThinkingLevel)})
+					map[string]any{"agent_id": agent.ID, "thinking_level": level})
 			}
 		}
 
@@ -1293,8 +1287,8 @@ func (al *AgentLoop) selectCandidates(
 // maybeSummarize triggers summarization if the session history exceeds thresholds.
 func (al *AgentLoop) maybeSummarize(agent *AgentInstance, sessionKey, channel, chatID string) {
 	newHistory := agent.Sessions.GetHistory(sessionKey)
-	tokenEstimate := al.estimateTokens(newHistory)
-	threshold := agent.ContextWindow * agent.SummarizeTokenPercent / 100
+	tokenEstimate := al.estimateTokens(agent, newHistory)
+	threshold := providers.EffectiveContextWindow(agent.ResolvedModelConfig) * agent.SummarizeTokenPercent / 100
 
 	if len(newHistory) > agent.SummarizeMessageThreshold || tokenEstimate > threshold {
 		summarizeKey := agent.ID + ":" + sessionKey
@@ -1464,7 +1458,7 @@ func (al *AgentLoop) summarizeSession(agent *AgentInstance, sessionKey string) {
 	toSummarize := history[:len(history)-4]
 
 	// Oversized Message Guard
-	maxMessageTokens := agent.ContextWindow / 2
+	maxMessageTokens := providers.EffectiveContextWindow(agent.ResolvedModelConfig) / 2
 	validMessages := make([]providers.Message, 0)
 	omitted := false
 
@@ -1574,8 +1568,8 @@ func (al *AgentLoop) retryLLMCall(
 			nil,
 			agent.Model,
 			map[string]any{
-				"max_tokens":       agent.MaxTokens,
-				"temperature":      agent.Temperature,
+				"max_tokens":       providers.EffectiveMaxTokens(agent.ResolvedModelConfig),
+				"top_p":            providers.EffectiveTopP(agent.ResolvedModelConfig),
 				"prompt_cache_key": agent.ID,
 			},
 		)
@@ -1654,10 +1648,18 @@ func (al *AgentLoop) summarizeBatch(
 	return fallback.String(), nil
 }
 
-// estimateTokens estimates the number of tokens in a message list.
-// Uses a safe heuristic of 2.5 characters per token to account for CJK and other
-// overheads better than the previous 3 chars/token.
-func (al *AgentLoop) estimateTokens(messages []providers.Message) int {
+// estimateTokens prefers the model's token counting API when configured, and
+// falls back to a simple character-based heuristic otherwise.
+func (al *AgentLoop) estimateTokens(agent *AgentInstance, messages []providers.Message) int {
+	if agent != nil && agent.ResolvedModelConfig != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if tokenCount, err := providers.CountTokens(ctx, agent.ResolvedModelConfig, messages); err == nil && tokenCount > 0 {
+			return tokenCount
+		}
+	}
+
 	totalChars := 0
 	for _, m := range messages {
 		totalChars += utf8.RuneCountInString(m.Content)

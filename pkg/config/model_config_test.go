@@ -250,7 +250,11 @@ func TestLoadConfig_NewSeparatedProviderModelConfig(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.json")
 	configJSON := `{
-		"default_model": "coder",
+		"agents": {
+			"defaults": {
+				"model": "coder"
+			}
+		},
 		"loop_control": {
 			"max_steps_per_turn": 12
 		},
@@ -265,8 +269,12 @@ func TestLoadConfig_NewSeparatedProviderModelConfig(t *testing.T) {
 			"coder": {
 				"provider": "openai-main",
 				"model": "gpt-5.2",
+				"max_tokens": 4096,
+				"temperature": 0.2,
+				"top_p": 0.8,
 				"thinking_level": "high",
-				"max_context_size": 200000
+				"max_context_size": 200000,
+				"token_count_api": "/tokenize"
 			}
 		}
 	}`
@@ -296,8 +304,20 @@ func TestLoadConfig_NewSeparatedProviderModelConfig(t *testing.T) {
 	if mc.Model != "openai/gpt-5.2" {
 		t.Fatalf("Model = %q, want %q", mc.Model, "openai/gpt-5.2")
 	}
+	if mc.MaxTokens != 4096 {
+		t.Fatalf("MaxTokens = %d, want 4096", mc.MaxTokens)
+	}
+	if mc.Temperature == nil || *mc.Temperature != 0.2 {
+		t.Fatalf("Temperature = %v, want 0.2", mc.Temperature)
+	}
+	if mc.TopP == nil || *mc.TopP != 0.8 {
+		t.Fatalf("TopP = %v, want 0.8", mc.TopP)
+	}
 	if mc.MaxContextSize != 200000 {
 		t.Fatalf("MaxContextSize = %d, want 200000", mc.MaxContextSize)
+	}
+	if mc.TokenCountAPI != "/tokenize" {
+		t.Fatalf("TokenCountAPI = %q, want %q", mc.TokenCountAPI, "/tokenize")
 	}
 }
 
@@ -305,7 +325,11 @@ func TestLoadConfig_NewSeparatedModelLoadBalancing(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.json")
 	configJSON := `{
-		"default_model": "lb",
+		"agents": {
+			"defaults": {
+				"model": "lb"
+			}
+		},
 		"providers": {
 			"primary": {
 				"type": "openai",

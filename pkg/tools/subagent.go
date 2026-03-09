@@ -22,18 +22,15 @@ type SubagentTask struct {
 }
 
 type SubagentManager struct {
-	tasks          map[string]*SubagentTask
-	mu             sync.RWMutex
-	provider       providers.LLMProvider
-	defaultModel   string
-	workspace      string
-	tools          *ToolRegistry
-	maxIterations  int
-	maxTokens      int
-	temperature    float64
-	hasMaxTokens   bool
-	hasTemperature bool
-	nextID         int
+	tasks         map[string]*SubagentTask
+	mu            sync.RWMutex
+	provider      providers.LLMProvider
+	defaultModel  string
+	workspace     string
+	tools         *ToolRegistry
+	maxIterations int
+	llmOptions    map[string]any
+	nextID        int
 }
 
 func NewSubagentManager(
@@ -51,14 +48,18 @@ func NewSubagentManager(
 	}
 }
 
-// SetLLMOptions sets max tokens and temperature for subagent LLM calls.
-func (sm *SubagentManager) SetLLMOptions(maxTokens int, temperature float64) {
+// SetLLMOptions sets LLM generation options for subagent calls.
+func (sm *SubagentManager) SetLLMOptions(options map[string]any) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
-	sm.maxTokens = maxTokens
-	sm.hasMaxTokens = true
-	sm.temperature = temperature
-	sm.hasTemperature = true
+	if len(options) == 0 {
+		sm.llmOptions = nil
+		return
+	}
+	sm.llmOptions = make(map[string]any, len(options))
+	for k, v := range options {
+		sm.llmOptions[k] = v
+	}
 }
 
 // SetTools sets the tool registry for subagent execution.
@@ -143,22 +144,14 @@ After completing the task, provide a clear summary of what was done.`
 	sm.mu.RLock()
 	tools := sm.tools
 	maxIter := sm.maxIterations
-	maxTokens := sm.maxTokens
-	temperature := sm.temperature
-	hasMaxTokens := sm.hasMaxTokens
-	hasTemperature := sm.hasTemperature
-	sm.mu.RUnlock()
-
-	var llmOptions map[string]any
-	if hasMaxTokens || hasTemperature {
-		llmOptions = map[string]any{}
-		if hasMaxTokens {
-			llmOptions["max_tokens"] = maxTokens
-		}
-		if hasTemperature {
-			llmOptions["temperature"] = temperature
+	llmOptions := map[string]any(nil)
+	if len(sm.llmOptions) > 0 {
+		llmOptions = make(map[string]any, len(sm.llmOptions))
+		for k, v := range sm.llmOptions {
+			llmOptions[k] = v
 		}
 	}
+	sm.mu.RUnlock()
 
 	loopResult, err := RunToolLoop(ctx, ToolLoopConfig{
 		Provider:      sm.provider,
@@ -297,22 +290,14 @@ func (t *SubagentTool) Execute(ctx context.Context, args map[string]any) *ToolRe
 	sm.mu.RLock()
 	tools := sm.tools
 	maxIter := sm.maxIterations
-	maxTokens := sm.maxTokens
-	temperature := sm.temperature
-	hasMaxTokens := sm.hasMaxTokens
-	hasTemperature := sm.hasTemperature
-	sm.mu.RUnlock()
-
-	var llmOptions map[string]any
-	if hasMaxTokens || hasTemperature {
-		llmOptions = map[string]any{}
-		if hasMaxTokens {
-			llmOptions["max_tokens"] = maxTokens
-		}
-		if hasTemperature {
-			llmOptions["temperature"] = temperature
+	llmOptions := map[string]any(nil)
+	if len(sm.llmOptions) > 0 {
+		llmOptions = make(map[string]any, len(sm.llmOptions))
+		for k, v := range sm.llmOptions {
+			llmOptions[k] = v
 		}
 	}
+	sm.mu.RUnlock()
 
 	// Fall back to "cli"/"direct" for non-conversation callers (e.g., CLI, tests)
 	// to preserve the same defaults as the original NewSubagentTool constructor.
