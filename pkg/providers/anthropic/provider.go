@@ -210,19 +210,18 @@ func buildParams(
 		case "user":
 			if msg.ToolCallID != "" {
 				anthropicMessages = append(anthropicMessages,
-					anthropic.NewUserMessage(anthropic.NewToolResultBlock(msg.ToolCallID, msg.Content, false)),
+					anthropic.NewUserMessage(newAnthropicToolResultBlock(msg)...),
 				)
 			} else {
-				anthropicMessages = append(anthropicMessages,
-					anthropic.NewUserMessage(anthropic.NewTextBlock(msg.Content)),
-				)
+				blocks := buildAnthropicContentBlocks(msg)
+				if len(blocks) == 0 {
+					blocks = append(blocks, anthropic.NewTextBlock(""))
+				}
+				anthropicMessages = append(anthropicMessages, anthropic.NewUserMessage(blocks...))
 			}
 		case "assistant":
-			if len(msg.ToolCalls) > 0 {
-				var blocks []anthropic.ContentBlockParamUnion
-				if msg.Content != "" {
-					blocks = append(blocks, anthropic.NewTextBlock(msg.Content))
-				}
+			if len(msg.ToolCalls) > 0 || len(msg.Media) > 0 {
+				blocks := buildAnthropicContentBlocks(msg)
 				for _, tc := range msg.ToolCalls {
 					args := tc.Arguments
 					if args == nil && tc.Function != nil && tc.Function.Arguments != "" {
@@ -235,6 +234,9 @@ func buildParams(
 					}
 					blocks = append(blocks, anthropic.NewToolUseBlock(tc.ID, args, tc.Name))
 				}
+				if len(blocks) == 0 {
+					blocks = append(blocks, anthropic.NewTextBlock(""))
+				}
 				anthropicMessages = append(anthropicMessages, anthropic.NewAssistantMessage(blocks...))
 			} else {
 				anthropicMessages = append(anthropicMessages,
@@ -243,7 +245,7 @@ func buildParams(
 			}
 		case "tool":
 			anthropicMessages = append(anthropicMessages,
-				anthropic.NewUserMessage(anthropic.NewToolResultBlock(msg.ToolCallID, msg.Content, false)),
+				anthropic.NewUserMessage(newAnthropicToolResultBlock(msg)...),
 			)
 		}
 	}
@@ -376,6 +378,70 @@ func translateTools(tools []ToolDefinition) []anthropic.ToolUnionParam {
 		result = append(result, anthropic.ToolUnionParam{OfTool: &tool})
 	}
 	return result
+}
+
+func buildAnthropicContentBlocks(msg Message) []anthropic.ContentBlockParamUnion {
+	blocks := make([]anthropic.ContentBlockParamUnion, 0, 1+len(msg.Media))
+	if msg.Content != "" {
+		blocks = append(blocks, anthropic.NewTextBlock(msg.Content))
+	}
+	for _, mediaURL := range msg.Media {
+		if img := parseImageURL(mediaURL); img != nil {
+			blocks = append(blocks, anthropic.ContentBlockParamUnion{OfImage: img})
+		}
+	}
+	return blocks
+}
+
+func newAnthropicToolResultBlock(msg Message) []anthropic.ContentBlockParamUnion {
+	content := make([]anthropic.ToolResultBlockParamContentUnion, 0, 1+len(msg.Media))
+	if msg.Content != "" {
+		content = append(content, anthropic.ToolResultBlockParamContentUnion{
+			OfText: &anthropic.TextBlockParam{Text: msg.Content},
+		})
+	}
+	for _, mediaURL := range msg.Media {
+		if img := parseImageURL(mediaURL); img != nil {
+			content = append(content, anthropic.ToolResultBlockParamContentUnion{OfImage: img})
+		}
+	}
+	if len(content) == 0 {
+		content = append(content, anthropic.ToolResultBlockParamContentUnion{
+			OfText: &anthropic.TextBlockParam{Text: ""},
+		})
+	}
+	return []anthropic.ContentBlockParamUnion{{
+		OfToolResult: &anthropic.ToolResultBlockParam{
+			ToolUseID: msg.ToolCallID,
+			Content:   content,
+		},
+	}}
+}
+
+// parseImageURL parses an image URL (data URI or HTTP URL) into an ImageBlockParam.
+// Returns nil if the URL is not a valid image source.
+func parseImageURL(mediaURL string) *anthropic.ImageBlockParam {
+	mediaURL = strings.TrimSpace(mediaURL)
+	switch {
+	case strings.HasPrefix(mediaURL, "data:image/"):
+		// Parse data:image/<type>;base64,<encoded>
+		header, encoded, ok := strings.Cut(strings.TrimPrefix(mediaURL, "data:"), ";base64,")
+		if !ok {
+			return nil
+		}
+		switch header {
+		case "image/jpeg", "image/png", "image/gif", "image/webp":
+			block := anthropic.NewImageBlockBase64(header, encoded)
+			return block.OfImage
+		default:
+			return nil
+		}
+	case strings.HasPrefix(mediaURL, "http://"), strings.HasPrefix(mediaURL, "https://"):
+		block := anthropic.NewImageBlock(anthropic.URLImageSourceParam{URL: mediaURL})
+		return block.OfImage
+	default:
+		return nil
+	}
 }
 
 func parseResponse(resp *anthropic.Message) *LLMResponse {

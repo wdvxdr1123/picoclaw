@@ -675,6 +675,27 @@ func TestSerializeMessages_WithMedia(t *testing.T) {
 	}
 }
 
+func TestSerializeMessages_WithRemoteImageURL(t *testing.T) {
+	messages := []protocoltypes.Message{
+		{Role: "user", Content: "describe this", Media: []string{"https://example.com/cat.png"}},
+	}
+	result := serializeMessages(messages)
+
+	data, _ := json.Marshal(result)
+	var msgs []map[string]any
+	json.Unmarshal(data, &msgs)
+
+	content := msgs[0]["content"].([]any)
+	if len(content) != 2 {
+		t.Fatalf("expected 2 content parts, got %d", len(content))
+	}
+	imgPart := content[1].(map[string]any)
+	imgURL := imgPart["image_url"].(map[string]any)
+	if imgURL["url"] != "https://example.com/cat.png" {
+		t.Fatalf("image url mismatch: %v", imgURL["url"])
+	}
+}
+
 func TestSerializeMessages_MediaWithToolCallID(t *testing.T) {
 	messages := []protocoltypes.Message{
 		{Role: "tool", Content: "image result", Media: []string{"data:image/png;base64,xyz"}, ToolCallID: "call_1"},

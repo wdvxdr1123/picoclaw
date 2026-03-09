@@ -447,7 +447,8 @@ type openaiMessage struct {
 func serializeMessages(messages []Message) []any {
 	out := make([]any, 0, len(messages))
 	for _, m := range messages {
-		if len(m.Media) == 0 {
+		parts := buildOpenAIContentParts(m)
+		if len(parts) == 0 {
 			out = append(out, openaiMessage{
 				Role:             m.Role,
 				Content:          m.Content,
@@ -456,25 +457,6 @@ func serializeMessages(messages []Message) []any {
 				ToolCallID:       m.ToolCallID,
 			})
 			continue
-		}
-
-		// Multipart content format for messages with media
-		parts := make([]map[string]any, 0, 1+len(m.Media))
-		if m.Content != "" {
-			parts = append(parts, map[string]any{
-				"type": "text",
-				"text": m.Content,
-			})
-		}
-		for _, mediaURL := range m.Media {
-			if strings.HasPrefix(mediaURL, "data:image/") {
-				parts = append(parts, map[string]any{
-					"type": "image_url",
-					"image_url": map[string]any{
-						"url": mediaURL,
-					},
-				})
-			}
 		}
 
 		msg := map[string]any{
@@ -493,6 +475,35 @@ func serializeMessages(messages []Message) []any {
 		out = append(out, msg)
 	}
 	return out
+}
+
+func buildOpenAIContentParts(m Message) []map[string]any {
+	parts := make([]map[string]any, 0, 1+len(m.Media))
+	if m.Content != "" {
+		parts = append(parts, map[string]any{
+			"type": "text",
+			"text": m.Content,
+		})
+	}
+	for _, mediaURL := range m.Media {
+		if !isImageMediaURL(mediaURL) {
+			continue
+		}
+		parts = append(parts, map[string]any{
+			"type": "image_url",
+			"image_url": map[string]any{
+				"url": mediaURL,
+			},
+		})
+	}
+	return parts
+}
+
+func isImageMediaURL(mediaURL string) bool {
+	mediaURL = strings.TrimSpace(mediaURL)
+	return strings.HasPrefix(mediaURL, "data:image/") ||
+		strings.HasPrefix(mediaURL, "http://") ||
+		strings.HasPrefix(mediaURL, "https://")
 }
 
 func normalizeModel(model, apiBase string) string {

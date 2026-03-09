@@ -65,6 +65,53 @@ func TestBuildParams_TopP(t *testing.T) {
 	}
 }
 
+func TestBuildParams_UserMessageWithImage(t *testing.T) {
+	params, err := buildParams([]Message{{
+		Role:    "user",
+		Content: "describe this",
+		Media:   []string{"https://example.com/cat.png"},
+	}}, nil, "claude-sonnet-4.6", map[string]any{"max_tokens": 1024})
+	if err != nil {
+		t.Fatalf("buildParams() error: %v", err)
+	}
+	if len(params.Messages) != 1 {
+		t.Fatalf("len(Messages) = %d, want 1", len(params.Messages))
+	}
+	content := params.Messages[0].Content
+	if len(content) != 2 {
+		t.Fatalf("len(content) = %d, want 2", len(content))
+	}
+	if content[1].OfImage == nil {
+		t.Fatalf("expected image block, got %+v", content[1])
+	}
+}
+
+func TestBuildParams_ToolResultWithImage(t *testing.T) {
+	params, err := buildParams([]Message{{
+		Role:       "tool",
+		ToolCallID: "call_1",
+		Content:    "tool result",
+		Media:      []string{"data:image/png;base64,abc123"},
+	}}, nil, "claude-sonnet-4.6", map[string]any{"max_tokens": 1024})
+	if err != nil {
+		t.Fatalf("buildParams() error: %v", err)
+	}
+	if len(params.Messages) != 1 {
+		t.Fatalf("len(Messages) = %d, want 1", len(params.Messages))
+	}
+	content := params.Messages[0].Content
+	if len(content) != 1 || content[0].OfToolResult == nil {
+		t.Fatalf("expected tool_result block, got %+v", content)
+	}
+	toolContent := content[0].OfToolResult.Content
+	if len(toolContent) != 2 {
+		t.Fatalf("len(toolContent) = %d, want 2", len(toolContent))
+	}
+	if toolContent[1].OfImage == nil {
+		t.Fatalf("expected image block in tool result, got %+v", toolContent[1])
+	}
+}
+
 func TestBuildParams_ToolCallMessage(t *testing.T) {
 	messages := []Message{
 		{Role: "user", Content: "What's the weather?"},
