@@ -13,11 +13,9 @@ import (
 func TestConvertProvidersToModelList_OpenAI(t *testing.T) {
 	cfg := &Config{
 		Providers: ProvidersConfig{
-			OpenAI: OpenAIProviderConfig{
-				ProviderConfig: ProviderConfig{
-					APIKey:  "sk-test-key",
-					APIBase: "https://custom.api.com/v1",
-				},
+			OpenAI: ProviderConfig{
+				APIKey:  "sk-test-key",
+				APIBase: "https://custom.api.com/v1",
 			},
 		},
 	}
@@ -93,7 +91,7 @@ func TestConvertProvidersToModelList_LiteLLM(t *testing.T) {
 func TestConvertProvidersToModelList_Multiple(t *testing.T) {
 	cfg := &Config{
 		Providers: ProvidersConfig{
-			OpenAI: OpenAIProviderConfig{ProviderConfig: ProviderConfig{APIKey: "openai-key"}},
+			OpenAI: ProviderConfig{APIKey: "openai-key"},
 			Groq:   ProviderConfig{APIKey: "groq-key"},
 			Zhipu:  ProviderConfig{APIKey: "zhipu-key"},
 		},
@@ -141,7 +139,7 @@ func TestConvertProvidersToModelList_Nil(t *testing.T) {
 func TestConvertProvidersToModelList_AllProviders(t *testing.T) {
 	cfg := &Config{
 		Providers: ProvidersConfig{
-			OpenAI:        OpenAIProviderConfig{ProviderConfig: ProviderConfig{APIKey: "key1"}},
+			OpenAI:        ProviderConfig{APIKey: "key1"},
 			LiteLLM:       ProviderConfig{APIKey: "key-litellm", APIBase: "http://localhost:4000/v1"},
 			Anthropic:     ProviderConfig{APIKey: "key2"},
 			OpenRouter:    ProviderConfig{APIKey: "key3"},
@@ -176,11 +174,9 @@ func TestConvertProvidersToModelList_AllProviders(t *testing.T) {
 func TestConvertProvidersToModelList_Proxy(t *testing.T) {
 	cfg := &Config{
 		Providers: ProvidersConfig{
-			OpenAI: OpenAIProviderConfig{
-				ProviderConfig: ProviderConfig{
-					APIKey: "key",
-					Proxy:  "http://proxy:8080",
-				},
+			OpenAI: ProviderConfig{
+				APIKey: "key",
+				Proxy:  "http://proxy:8080",
 			},
 		},
 	}
@@ -220,10 +216,8 @@ func TestConvertProvidersToModelList_RequestTimeout(t *testing.T) {
 func TestConvertProvidersToModelList_AuthMethod(t *testing.T) {
 	cfg := &Config{
 		Providers: ProvidersConfig{
-			OpenAI: OpenAIProviderConfig{
-				ProviderConfig: ProviderConfig{
-					AuthMethod: "oauth",
-				},
+			OpenAI: ProviderConfig{
+				AuthMethod: "oauth",
 			},
 		},
 	}
@@ -271,7 +265,7 @@ func TestConvertProvidersToModelList_PreservesUserModel_OpenAI(t *testing.T) {
 			},
 		},
 		Providers: ProvidersConfig{
-			OpenAI: OpenAIProviderConfig{ProviderConfig: ProviderConfig{APIKey: "sk-openai"}},
+			OpenAI: ProviderConfig{APIKey: "sk-openai"},
 		},
 	}
 
@@ -368,7 +362,7 @@ func TestConvertProvidersToModelList_MultipleProviders_PreservesUserModel(t *tes
 			},
 		},
 		Providers: ProvidersConfig{
-			OpenAI:   OpenAIProviderConfig{ProviderConfig: ProviderConfig{APIKey: "sk-openai"}},
+			OpenAI:   ProviderConfig{APIKey: "sk-openai"},
 			DeepSeek: ProviderConfig{APIKey: "sk-deepseek"},
 		},
 	}
@@ -425,7 +419,7 @@ func TestConvertProvidersToModelList_ProviderNameAliases(t *testing.T) {
 			// Set the appropriate provider config
 			switch tt.providerAlias {
 			case "gpt":
-				cfg.Providers.OpenAI = OpenAIProviderConfig{ProviderConfig: tt.provider}
+				cfg.Providers.OpenAI = tt.provider
 			case "claude":
 				cfg.Providers.Anthropic = tt.provider
 			case "doubao":
@@ -505,7 +499,7 @@ func TestConvertProvidersToModelList_NoProviderField_MultipleProviders(t *testin
 			},
 		},
 		Providers: ProvidersConfig{
-			OpenAI: OpenAIProviderConfig{ProviderConfig: ProviderConfig{APIKey: "openai-key"}},
+			OpenAI: ProviderConfig{APIKey: "openai-key"},
 			Zhipu:  ProviderConfig{APIKey: "zhipu-key"},
 		},
 	}

@@ -34,6 +34,7 @@ func agentCmd(message, sessionKey, model string, debug bool) error {
 	}
 
 	if model != "" {
+		cfg.DefaultModel = model
 		cfg.Agents.Defaults.ModelName = model
 	}
 
@@ -44,6 +45,7 @@ func agentCmd(message, sessionKey, model string, debug bool) error {
 
 	// Use the resolved model ID from provider creation
 	if modelID != "" {
+		cfg.DefaultModel = modelID
 		cfg.Agents.Defaults.ModelName = modelID
 	}
 

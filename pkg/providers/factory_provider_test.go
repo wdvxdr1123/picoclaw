@@ -136,12 +136,6 @@ func TestCreateProviderFromConfig_DefaultAPIBase(t *testing.T) {
 	}
 }
 
-func TestGetDefaultAPIBase_LiteLLM(t *testing.T) {
-	if got := getDefaultAPIBase("litellm"); got != "http://localhost:4000/v1" {
-		t.Fatalf("getDefaultAPIBase(%q) = %q, want %q", "litellm", got, "http://localhost:4000/v1")
-	}
-}
-
 func TestCreateProviderFromConfig_LiteLLM(t *testing.T) {
 	cfg := &config.ModelConfig{
 		ModelName: "test-litellm",
@@ -247,16 +241,42 @@ func TestCreateProviderFromConfig_MissingAPIKey(t *testing.T) {
 	}
 }
 
-func TestCreateProviderFromConfig_UnknownProtocol(t *testing.T) {
+func TestCreateProviderFromConfig_CustomOpenAICompatibleProtocol(t *testing.T) {
 	cfg := &config.ModelConfig{
 		ModelName: "test-unknown",
 		Model:     "unknown-protocol/model",
 		APIKey:    "test-key",
+		APIBase:   "https://example.com/v1",
 	}
 
-	_, _, err := CreateProviderFromConfig(cfg)
-	if err == nil {
-		t.Fatal("CreateProviderFromConfig() expected error for unknown protocol")
+	provider, modelID, err := CreateProviderFromConfig(cfg)
+	if err != nil {
+		t.Fatalf("CreateProviderFromConfig() error = %v", err)
+	}
+	if _, ok := provider.(*HTTPProvider); !ok {
+		t.Fatalf("expected *HTTPProvider, got %T", provider)
+	}
+	if modelID != "model" {
+		t.Fatalf("modelID = %q, want %q", modelID, "model")
+	}
+}
+
+func TestResolveWireFormat(t *testing.T) {
+	tests := []struct {
+		protocol string
+		want     WireFormat
+	}{
+		{protocol: "anthropic", want: WireFormatAnthropic},
+		{protocol: "claude", want: WireFormatAnthropic},
+		{protocol: "openai", want: WireFormatOpenAI},
+		{protocol: "deepseek", want: WireFormatOpenAI},
+		{protocol: "unknown", want: WireFormatOpenAI},
+	}
+
+	for _, tt := range tests {
+		if got := ResolveWireFormat(tt.protocol); got != tt.want {
+			t.Fatalf("ResolveWireFormat(%q) = %q, want %q", tt.protocol, got, tt.want)
+		}
 	}
 }
 

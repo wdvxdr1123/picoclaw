@@ -7,6 +7,8 @@ package config
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -241,6 +243,100 @@ func TestFullConfig_JSON_BackwardCompat(t *testing.T) {
 				t.Errorf("Model = %q, want %q", modelCfg.Model, "openai/gpt-4o")
 			}
 		})
+	}
+}
+
+func TestLoadConfig_NewSeparatedProviderModelConfig(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.json")
+	configJSON := `{
+		"default_model": "coder",
+		"loop_control": {
+			"max_steps_per_turn": 12
+		},
+		"providers": {
+			"openai-main": {
+				"type": "openai",
+				"api_key": "sk-test",
+				"api_base": "https://api.openai.com/v1"
+			}
+		},
+		"models": {
+			"coder": {
+				"provider": "openai-main",
+				"model": "gpt-5.2",
+				"thinking_level": "high",
+				"max_context_size": 200000
+			}
+		}
+	}`
+	if err := os.WriteFile(configPath, []byte(configJSON), 0o600); err != nil {
+		t.Fatalf("WriteFile() error: %v", err)
+	}
+
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadConfig() error = %v", err)
+	}
+
+	if cfg.GetDefaultModelName() != "coder" {
+		t.Fatalf("GetDefaultModelName() = %q, want %q", cfg.GetDefaultModelName(), "coder")
+	}
+	if cfg.LoopControl.MaxStepsPerTurn != 12 {
+		t.Fatalf("LoopControl.MaxStepsPerTurn = %d, want 12", cfg.LoopControl.MaxStepsPerTurn)
+	}
+
+	mc, err := cfg.GetModelConfig("coder")
+	if err != nil {
+		t.Fatalf("GetModelConfig() error = %v", err)
+	}
+	if mc.Provider != "openai-main" {
+		t.Fatalf("Provider = %q, want %q", mc.Provider, "openai-main")
+	}
+	if mc.Model != "openai/gpt-5.2" {
+		t.Fatalf("Model = %q, want %q", mc.Model, "openai/gpt-5.2")
+	}
+	if mc.MaxContextSize != 200000 {
+		t.Fatalf("MaxContextSize = %d, want 200000", mc.MaxContextSize)
+	}
+}
+
+func TestLoadConfig_NewSeparatedModelLoadBalancing(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.json")
+	configJSON := `{
+		"default_model": "lb",
+		"providers": {
+			"primary": {
+				"type": "openai",
+				"api_key": "sk-1"
+			},
+			"secondary": {
+				"type": "openai",
+				"api_key": "sk-2"
+			}
+		},
+		"models": {
+			"lb": [
+				{"provider": "primary", "model": "gpt-5.2"},
+				{"provider": "secondary", "model": "gpt-5.2"}
+			]
+		}
+	}`
+	if err := os.WriteFile(configPath, []byte(configJSON), 0o600); err != nil {
+		t.Fatalf("WriteFile() error: %v", err)
+	}
+
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadConfig() error = %v", err)
+	}
+
+	if len(cfg.ModelList) != 2 {
+		t.Fatalf("len(ModelList) = %d, want 2", len(cfg.ModelList))
+	}
+	if cfg.ModelList[0].Provider != "primary" || cfg.ModelList[1].Provider != "secondary" {
+		t.Fatalf("providers = %+v, want primary/secondary", []string{cfg.ModelList[0].Provider, cfg.ModelList[1].Provider})
 	}
 }
 

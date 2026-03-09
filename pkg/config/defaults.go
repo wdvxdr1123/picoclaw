@@ -23,7 +23,11 @@ func DefaultConfig() *Config {
 	}
 	workspacePath := filepath.Join(homePath, "workspace")
 
-	return &Config{
+	cfg := &Config{
+		DefaultModel: "",
+		LoopControl: LoopControlConfig{
+			MaxStepsPerTurn: 50,
+		},
 		Agents: AgentsConfig{
 			Defaults: AgentDefaults{
 				Workspace:                 workspacePath,
@@ -86,183 +90,155 @@ func DefaultConfig() *Config {
 			},
 		},
 		Providers: ProvidersConfig{
-			OpenAI: OpenAIProviderConfig{WebSearch: true},
+			OpenAI: ProviderConfig{
+				Type:      "openai",
+				APIBase:   "https://api.openai.com/v1",
+				WebSearch: true,
+			},
+			Anthropic: ProviderConfig{
+				Type:    "anthropic",
+				APIBase: "https://api.anthropic.com/v1",
+			},
+			Zhipu: ProviderConfig{
+				Type:    "zhipu",
+				APIBase: "https://open.bigmodel.cn/api/paas/v4",
+			},
+			DeepSeek: ProviderConfig{
+				Type:    "deepseek",
+				APIBase: "https://api.deepseek.com/v1",
+			},
+			Gemini: ProviderConfig{
+				Type:    "gemini",
+				APIBase: "https://generativelanguage.googleapis.com/v1beta",
+			},
+			Qwen: ProviderConfig{
+				Type:    "qwen",
+				APIBase: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+			},
+			Moonshot: ProviderConfig{
+				Type:    "moonshot",
+				APIBase: "https://api.moonshot.cn/v1",
+			},
+			Groq: ProviderConfig{
+				Type:    "groq",
+				APIBase: "https://api.groq.com/openai/v1",
+			},
+			OpenRouter: ProviderConfig{
+				Type:    "openrouter",
+				APIBase: "https://openrouter.ai/api/v1",
+			},
+			Nvidia: ProviderConfig{
+				Type:    "nvidia",
+				APIBase: "https://integrate.api.nvidia.com/v1",
+			},
+			Cerebras: ProviderConfig{
+				Type:    "cerebras",
+				APIBase: "https://api.cerebras.ai/v1",
+			},
+			Vivgrid: ProviderConfig{
+				Type:    "vivgrid",
+				APIBase: "https://api.vivgrid.com/v1",
+			},
+			VolcEngine: ProviderConfig{
+				Type:    "volcengine",
+				APIBase: "https://ark.cn-beijing.volces.com/api/v3",
+			},
+			ShengSuanYun: ProviderConfig{
+				Type:    "shengsuanyun",
+				APIBase: "https://api.shengsuanyun.com/v1",
+			},
+			Antigravity: ProviderConfig{
+				Type:       "antigravity",
+				AuthMethod: "oauth",
+			},
+			GitHubCopilot: ProviderConfig{
+				Type:       "github-copilot",
+				APIBase:    "http://localhost:4321",
+				AuthMethod: "oauth",
+			},
+			Ollama: ProviderConfig{
+				Type:    "ollama",
+				APIBase: "http://localhost:11434/v1",
+			},
+			Mistral: ProviderConfig{
+				Type:    "mistral",
+				APIBase: "https://api.mistral.ai/v1",
+			},
+			Avian: ProviderConfig{
+				Type:    "avian",
+				APIBase: "https://api.avian.io/v1",
+			},
+			VLLM: ProviderConfig{
+				Type:    "vllm",
+				APIBase: "http://localhost:8000/v1",
+			},
 		},
-		ModelList: []ModelConfig{
+		Models: ModelsConfig{
 			// ============================================
 			// Add your API key to the model you want to use
 			// ============================================
 
 			// Zhipu AI - https://open.bigmodel.cn/usercenter/apikeys
-			{
-				ModelName: "glm-4.7",
-				Model:     "zhipu/glm-4.7",
-				APIBase:   "https://open.bigmodel.cn/api/paas/v4",
-				APIKey:    "",
-			},
+			"glm-4.7": {{Provider: "zhipu", Model: "glm-4.7"}},
 
 			// OpenAI - https://platform.openai.com/api-keys
-			{
-				ModelName: "gpt-5.2",
-				Model:     "openai/gpt-5.2",
-				APIBase:   "https://api.openai.com/v1",
-				APIKey:    "",
-			},
+			"gpt-5.2": {{Provider: "openai", Model: "gpt-5.2"}},
 
 			// Anthropic Claude - https://console.anthropic.com/settings/keys
-			{
-				ModelName: "claude-sonnet-4.6",
-				Model:     "anthropic/claude-sonnet-4.6",
-				APIBase:   "https://api.anthropic.com/v1",
-				APIKey:    "",
-			},
+			"claude-sonnet-4.6": {{Provider: "anthropic", Model: "claude-sonnet-4.6"}},
 
 			// DeepSeek - https://platform.deepseek.com/
-			{
-				ModelName: "deepseek-chat",
-				Model:     "deepseek/deepseek-chat",
-				APIBase:   "https://api.deepseek.com/v1",
-				APIKey:    "",
-			},
+			"deepseek-chat": {{Provider: "deepseek", Model: "deepseek-chat"}},
 
 			// Google Gemini - https://ai.google.dev/
-			{
-				ModelName: "gemini-2.0-flash",
-				Model:     "gemini/gemini-2.0-flash-exp",
-				APIBase:   "https://generativelanguage.googleapis.com/v1beta",
-				APIKey:    "",
-			},
+			"gemini-2.0-flash": {{Provider: "gemini", Model: "gemini-2.0-flash-exp"}},
 
 			// Qwen - https://dashscope.console.aliyun.com/apiKey
-			{
-				ModelName: "qwen-plus",
-				Model:     "qwen/qwen-plus",
-				APIBase:   "https://dashscope.aliyuncs.com/compatible-mode/v1",
-				APIKey:    "",
-			},
+			"qwen-plus": {{Provider: "qwen", Model: "qwen-plus"}},
 
 			// Moonshot - https://platform.moonshot.cn/console/api-keys
-			{
-				ModelName: "moonshot-v1-8k",
-				Model:     "moonshot/moonshot-v1-8k",
-				APIBase:   "https://api.moonshot.cn/v1",
-				APIKey:    "",
-			},
+			"moonshot-v1-8k": {{Provider: "moonshot", Model: "moonshot-v1-8k"}},
 
 			// Groq - https://console.groq.com/keys
-			{
-				ModelName: "llama-3.3-70b",
-				Model:     "groq/llama-3.3-70b-versatile",
-				APIBase:   "https://api.groq.com/openai/v1",
-				APIKey:    "",
-			},
+			"llama-3.3-70b": {{Provider: "groq", Model: "llama-3.3-70b-versatile"}},
 
 			// OpenRouter (100+ models) - https://openrouter.ai/keys
-			{
-				ModelName: "openrouter-auto",
-				Model:     "openrouter/auto",
-				APIBase:   "https://openrouter.ai/api/v1",
-				APIKey:    "",
-			},
-			{
-				ModelName: "openrouter-gpt-5.2",
-				Model:     "openrouter/openai/gpt-5.2",
-				APIBase:   "https://openrouter.ai/api/v1",
-				APIKey:    "",
-			},
+			"openrouter-auto":    {{Provider: "openrouter", Model: "auto"}},
+			"openrouter-gpt-5.2": {{Provider: "openrouter", Model: "openai/gpt-5.2"}},
 
 			// NVIDIA - https://build.nvidia.com/
-			{
-				ModelName: "nemotron-4-340b",
-				Model:     "nvidia/nemotron-4-340b-instruct",
-				APIBase:   "https://integrate.api.nvidia.com/v1",
-				APIKey:    "",
-			},
+			"nemotron-4-340b": {{Provider: "nvidia", Model: "nemotron-4-340b-instruct"}},
 
 			// Cerebras - https://inference.cerebras.ai/
-			{
-				ModelName: "cerebras-llama-3.3-70b",
-				Model:     "cerebras/llama-3.3-70b",
-				APIBase:   "https://api.cerebras.ai/v1",
-				APIKey:    "",
-			},
+			"cerebras-llama-3.3-70b": {{Provider: "cerebras", Model: "llama-3.3-70b"}},
 
 			// Vivgrid - https://vivgrid.com
-			{
-				ModelName: "vivgrid-auto",
-				Model:     "vivgrid/auto",
-				APIBase:   "https://api.vivgrid.com/v1",
-				APIKey:    "",
-			},
+			"vivgrid-auto": {{Provider: "vivgrid", Model: "auto"}},
 
 			// Volcengine - https://console.volcengine.com/ark
-			{
-				ModelName: "doubao-pro",
-				Model:     "volcengine/doubao-pro-32k",
-				APIBase:   "https://ark.cn-beijing.volces.com/api/v3",
-				APIKey:    "",
-			},
+			"doubao-pro": {{Provider: "volcengine", Model: "doubao-pro-32k"}},
 
 			// ShengsuanYun
-			{
-				ModelName: "deepseek-v3",
-				Model:     "shengsuanyun/deepseek-v3",
-				APIBase:   "https://api.shengsuanyun.com/v1",
-				APIKey:    "",
-			},
+			"deepseek-v3": {{Provider: "shengsuanyun", Model: "deepseek-v3"}},
 
 			// Antigravity (Google Cloud Code Assist) - OAuth only
-			{
-				ModelName:  "gemini-flash",
-				Model:      "antigravity/gemini-3-flash",
-				AuthMethod: "oauth",
-			},
+			"gemini-flash": {{Provider: "antigravity", Model: "gemini-3-flash"}},
 
 			// GitHub Copilot - https://github.com/settings/tokens
-			{
-				ModelName:  "copilot-gpt-5.2",
-				Model:      "github-copilot/gpt-5.2",
-				APIBase:    "http://localhost:4321",
-				AuthMethod: "oauth",
-			},
+			"copilot-gpt-5.2": {{Provider: "github_copilot", Model: "gpt-5.2"}},
 
 			// Ollama (local) - https://ollama.com
-			{
-				ModelName: "llama3",
-				Model:     "ollama/llama3",
-				APIBase:   "http://localhost:11434/v1",
-				APIKey:    "ollama",
-			},
+			"llama3": {{Provider: "ollama", Model: "llama3"}},
 
 			// Mistral AI - https://console.mistral.ai/api-keys
-			{
-				ModelName: "mistral-small",
-				Model:     "mistral/mistral-small-latest",
-				APIBase:   "https://api.mistral.ai/v1",
-				APIKey:    "",
-			},
+			"mistral-small": {{Provider: "mistral", Model: "mistral-small-latest"}},
 
 			// Avian - https://avian.io
-			{
-				ModelName: "deepseek-v3.2",
-				Model:     "avian/deepseek/deepseek-v3.2",
-				APIBase:   "https://api.avian.io/v1",
-				APIKey:    "",
-			},
-			{
-				ModelName: "kimi-k2.5",
-				Model:     "avian/moonshotai/kimi-k2.5",
-				APIBase:   "https://api.avian.io/v1",
-				APIKey:    "",
-			},
+			"deepseek-v3.2": {{Provider: "avian", Model: "deepseek/deepseek-v3.2"}},
+			"kimi-k2.5":     {{Provider: "avian", Model: "moonshotai/kimi-k2.5"}},
 
 			// VLLM (local) - http://localhost:8000
-			{
-				ModelName: "local-model",
-				Model:     "vllm/custom-model",
-				APIBase:   "http://localhost:8000/v1",
-				APIKey:    "",
-			},
+			"local-model": {{Provider: "vllm", Model: "custom-model"}},
 		},
 		Gateway: GatewayConfig{
 			Host: "127.0.0.1",
@@ -390,4 +366,8 @@ func DefaultConfig() *Config {
 			MonitorUSB: true,
 		},
 	}
+
+	cfg.ApplyCompatibilityDefaults()
+	cfg.ModelList, _ = cfg.ResolveModelListFromModels()
+	return cfg
 }

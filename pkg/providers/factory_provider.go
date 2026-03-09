@@ -52,10 +52,13 @@ func ExtractProtocol(model string) (protocol, modelID string) {
 	return protocol, modelID
 }
 
-// CreateProviderFromConfig creates a provider based on the ModelConfig.
-// It uses the protocol prefix in the Model field to determine which provider to create.
-// Supported protocols: openai, litellm, anthropic, antigravity, claude-cli, codex-cli, github-copilot
-// Returns the provider, the model ID (without protocol prefix), and any error.
+// CreateProviderFromConfig creates a provider based on the resolved ModelConfig.
+// Wire formats are intentionally collapsed to two families:
+//   - Anthropic-compatible
+//   - OpenAI-compatible
+//
+// Some legacy transports (CLI/grpc/custom auth) remain special-cased, but all
+// HTTP provider routing is reduced to these two wire formats.
 func CreateProviderFromConfig(cfg *config.ModelConfig) (LLMProvider, string, error) {
 	if cfg == nil {
 		return nil, "", fmt.Errorf("config is nil")
@@ -67,64 +70,18 @@ func CreateProviderFromConfig(cfg *config.ModelConfig) (LLMProvider, string, err
 
 	protocol, modelID := ExtractProtocol(cfg.Model)
 
-	switch protocol {
-	case "openai":
-		// OpenAI with OAuth/token auth (Codex-style)
+	switch ResolveWireFormat(protocol) {
+	case WireFormatAnthropic:
 		if cfg.AuthMethod == "oauth" || cfg.AuthMethod == "token" {
-			provider, err := createCodexAuthProvider()
-			if err != nil {
-				return nil, "", err
-			}
-			return provider, modelID, nil
-		}
-		// OpenAI with API key
-		if cfg.APIKey == "" && cfg.APIBase == "" {
-			return nil, "", fmt.Errorf("api_key or api_base is required for HTTP-based protocol %q", protocol)
-		}
-		apiBase := cfg.APIBase
-		if apiBase == "" {
-			apiBase = getDefaultAPIBase(protocol)
-		}
-		return NewHTTPProviderWithMaxTokensFieldAndRequestTimeout(
-			cfg.APIKey,
-			apiBase,
-			cfg.Proxy,
-			cfg.MaxTokensField,
-			cfg.RequestTimeout,
-		), modelID, nil
-
-	case "litellm", "openrouter", "groq", "zhipu", "gemini", "nvidia",
-		"ollama", "moonshot", "shengsuanyun", "deepseek", "cerebras",
-		"vivgrid", "volcengine", "vllm", "qwen", "mistral", "avian":
-		// All other OpenAI-compatible HTTP providers
-		if cfg.APIKey == "" && cfg.APIBase == "" {
-			return nil, "", fmt.Errorf("api_key or api_base is required for HTTP-based protocol %q", protocol)
-		}
-		apiBase := cfg.APIBase
-		if apiBase == "" {
-			apiBase = getDefaultAPIBase(protocol)
-		}
-		return NewHTTPProviderWithMaxTokensFieldAndRequestTimeout(
-			cfg.APIKey,
-			apiBase,
-			cfg.Proxy,
-			cfg.MaxTokensField,
-			cfg.RequestTimeout,
-		), modelID, nil
-
-	case "anthropic":
-		if cfg.AuthMethod == "oauth" || cfg.AuthMethod == "token" {
-			// Use OAuth credentials from auth store
 			provider, err := createClaudeAuthProvider()
 			if err != nil {
 				return nil, "", err
 			}
 			return provider, modelID, nil
 		}
-		// Use API key with HTTP API
 		apiBase := cfg.APIBase
 		if apiBase == "" {
-			apiBase = "https://api.anthropic.com/v1"
+			apiBase = defaultAnthropicAPIBase
 		}
 		if cfg.APIKey == "" {
 			return nil, "", fmt.Errorf("api_key is required for anthropic protocol (model: %s)", cfg.Model)
@@ -134,83 +91,29 @@ func CreateProviderFromConfig(cfg *config.ModelConfig) (LLMProvider, string, err
 			apiBase,
 		), modelID, nil
 
-	case "antigravity":
-		return NewAntigravityProvider(), modelID, nil
-
-	case "claude-cli", "claudecli":
-		workspace := cfg.Workspace
-		if workspace == "" {
-			workspace = "."
+	case WireFormatOpenAI:
+		if strings.EqualFold(protocol, "openai") && (cfg.AuthMethod == "oauth" || cfg.AuthMethod == "token") {
+			provider, err := createCodexAuthProvider()
+			if err != nil {
+				return nil, "", err
+			}
+			return provider, modelID, nil
 		}
-		return NewClaudeCliProvider(workspace), modelID, nil
-
-	case "codex-cli", "codexcli":
-		workspace := cfg.Workspace
-		if workspace == "" {
-			workspace = "."
+		if cfg.APIKey == "" && cfg.APIBase == "" {
+			return nil, "", fmt.Errorf("api_key or api_base is required for openai-compatible protocol %q", protocol)
 		}
-		return NewCodexCliProvider(workspace), modelID, nil
-
-	case "github-copilot", "copilot":
 		apiBase := cfg.APIBase
 		if apiBase == "" {
-			apiBase = "localhost:4321"
+			return nil, "", fmt.Errorf("api_base is required for custom openai-compatible protocol %q", protocol)
 		}
-		connectMode := cfg.ConnectMode
-		if connectMode == "" {
-			connectMode = "grpc"
-		}
-		provider, err := NewGitHubCopilotProvider(apiBase, connectMode, modelID)
-		if err != nil {
-			return nil, "", err
-		}
-		return provider, modelID, nil
-
-	default:
-		return nil, "", fmt.Errorf("unknown protocol %q in model %q", protocol, cfg.Model)
+		return NewHTTPProviderWithMaxTokensFieldAndRequestTimeout(
+			cfg.APIKey,
+			apiBase,
+			cfg.Proxy,
+			cfg.MaxTokensField,
+			cfg.RequestTimeout,
+		), modelID, nil
 	}
-}
 
-// getDefaultAPIBase returns the default API base URL for a given protocol.
-func getDefaultAPIBase(protocol string) string {
-	switch protocol {
-	case "openai":
-		return "https://api.openai.com/v1"
-	case "openrouter":
-		return "https://openrouter.ai/api/v1"
-	case "litellm":
-		return "http://localhost:4000/v1"
-	case "groq":
-		return "https://api.groq.com/openai/v1"
-	case "zhipu":
-		return "https://open.bigmodel.cn/api/paas/v4"
-	case "gemini":
-		return "https://generativelanguage.googleapis.com/v1beta"
-	case "nvidia":
-		return "https://integrate.api.nvidia.com/v1"
-	case "ollama":
-		return "http://localhost:11434/v1"
-	case "moonshot":
-		return "https://api.moonshot.cn/v1"
-	case "shengsuanyun":
-		return "https://router.shengsuanyun.com/api/v1"
-	case "deepseek":
-		return "https://api.deepseek.com/v1"
-	case "cerebras":
-		return "https://api.cerebras.ai/v1"
-	case "vivgrid":
-		return "https://api.vivgrid.com/v1"
-	case "volcengine":
-		return "https://ark.cn-beijing.volces.com/api/v3"
-	case "qwen":
-		return "https://dashscope.aliyuncs.com/compatible-mode/v1"
-	case "vllm":
-		return "http://localhost:8000/v1"
-	case "mistral":
-		return "https://api.mistral.ai/v1"
-	case "avian":
-		return "https://api.avian.io/v1"
-	default:
-		return ""
-	}
+	return nil, "", fmt.Errorf("unsupported provider wire format for model %q", cfg.Model)
 }

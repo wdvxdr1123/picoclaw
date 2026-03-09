@@ -223,28 +223,39 @@ picoclaw onboard
 
 ```json
 {
+  "default_model": "gpt4",
+  "loop_control": {
+    "max_steps_per_turn": 20
+  },
   "agents": {
     "defaults": {
       "workspace": "~/.picoclaw/workspace",
-      "model_name": "gpt4",
       "max_tokens": 8192,
       "temperature": 0.7,
-      "max_tool_iterations": 20
+      "restrict_to_workspace": true
     }
   },
-  "model_list": [
-    {
-      "model_name": "gpt4",
-      "model": "openai/gpt-5.2",
+  "providers": {
+    "openai": {
+      "type": "openai",
       "api_key": "your-api-key",
       "request_timeout": 300
     },
-    {
-      "model_name": "claude-sonnet-4.6",
-      "model": "anthropic/claude-sonnet-4.6",
+    "anthropic": {
+      "type": "anthropic",
       "api_key": "your-anthropic-key"
     }
-  ],
+  },
+  "models": {
+    "gpt4": {
+      "provider": "openai",
+      "model": "gpt-5.2"
+    },
+    "claude-sonnet-4.6": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4.6"
+    }
+  },
   "tools": {
     "web": {
       "brave": {
@@ -265,7 +276,7 @@ picoclaw onboard
 }
 ```
 
-> **新功能**: `model_list` 配置格式支持零代码添加 provider。详见[模型配置](#模型配置-model_list)章节。
+> **新功能**: PicoClaw 现在使用 `providers` + `models` 的分离式配置。详见下文 Provider 与模型配置章节。
 > `request_timeout` 为可选项，单位为秒。若省略或设置为 `<= 0`，PicoClaw 使用默认超时（120 秒）。
 
 **3. 获取 API Key**
@@ -486,7 +497,7 @@ Agent 读取 HEARTBEAT.md
 | `groq`               | LLM + **语音转录** (Whisper) | [console.groq.com](https://console.groq.com)                         |
 | `cerebras`           | LLM (Cerebras 直连)          | [cerebras.ai](https://cerebras.ai)                                   |
 
-### 模型配置 (model_list)
+### Provider 与模型配置
 
 > **新功能！** PicoClaw 现在采用**以模型为中心**的配置方式。只需使用 `厂商/模型` 格式（如 `zhipu/glm-4.7`）即可添加新的 provider——**无需修改任何代码！**
 
@@ -523,26 +534,33 @@ Agent 读取 HEARTBEAT.md
 
 ```json
 {
-  "model_list": [
-    {
-      "model_name": "gpt-5.2",
-      "model": "openai/gpt-5.2",
+  "default_model": "gpt-5.2",
+  "providers": {
+    "openai": {
+      "type": "openai",
       "api_key": "sk-your-openai-key"
     },
-    {
-      "model_name": "claude-sonnet-4.6",
-      "model": "anthropic/claude-sonnet-4.6",
+    "anthropic": {
+      "type": "anthropic",
       "api_key": "sk-ant-your-key"
     },
-    {
-      "model_name": "glm-4.7",
-      "model": "zhipu/glm-4.7",
+    "zhipu": {
+      "type": "zhipu",
       "api_key": "your-zhipu-key"
     }
-  ],
-  "agents": {
-    "defaults": {
+  },
+  "models": {
+    "gpt-5.2": {
+      "provider": "openai",
       "model": "gpt-5.2"
+    },
+    "claude-sonnet-4.6": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4.6"
+    },
+    "glm-4.7": {
+      "provider": "zhipu",
+      "model": "glm-4.7"
     }
   }
 }
@@ -619,20 +637,30 @@ Agent 读取 HEARTBEAT.md
 
 ```json
 {
-  "model_list": [
-    {
-      "model_name": "gpt-5.2",
-      "model": "openai/gpt-5.2",
+  "providers": {
+    "openai-primary": {
+      "type": "openai",
       "api_base": "https://api1.example.com/v1",
       "api_key": "sk-key1"
     },
-    {
-      "model_name": "gpt-5.2",
-      "model": "openai/gpt-5.2",
+    "openai-secondary": {
+      "type": "openai",
       "api_base": "https://api2.example.com/v1",
       "api_key": "sk-key2"
     }
-  ]
+  },
+  "models": {
+    "gpt-5.2": [
+      {
+        "provider": "openai-primary",
+        "model": "gpt-5.2"
+      },
+      {
+        "provider": "openai-secondary",
+        "model": "gpt-5.2"
+      }
+    ]
+  }
 }
 ```
 
@@ -663,15 +691,16 @@ Agent 读取 HEARTBEAT.md
 
 ```json
 {
-  "model_list": [
-    {
-      "model_name": "glm-4.7",
-      "model": "zhipu/glm-4.7",
+  "default_model": "glm-4.7",
+  "providers": {
+    "zhipu": {
+      "type": "zhipu",
       "api_key": "your-key"
     }
-  ],
-  "agents": {
-    "defaults": {
+  },
+  "models": {
+    "glm-4.7": {
+      "provider": "zhipu",
       "model": "glm-4.7"
     }
   }

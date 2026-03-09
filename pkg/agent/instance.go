@@ -57,7 +57,7 @@ func NewAgentInstance(
 	workspace := resolveAgentWorkspace(agentCfg, defaults)
 	os.MkdirAll(workspace, 0o755)
 
-	model := resolveAgentModel(agentCfg, defaults)
+	model := resolveAgentModel(agentCfg, defaults, cfg)
 	fallbacks := resolveAgentFallbacks(agentCfg, defaults)
 
 	restrict := defaults.RestrictToWorkspace
@@ -125,9 +125,13 @@ func NewAgentInstance(
 		temperature = *defaults.Temperature
 	}
 
-	var thinkingLevelStr string
+	var (
+		thinkingLevelStr string
+		maxContextSize   int
+	)
 	if mc, err := cfg.GetModelConfig(model); err == nil {
 		thinkingLevelStr = mc.ThinkingLevel
+		maxContextSize = mc.MaxContextSize
 	}
 	thinkingLevel := parseThinkingLevel(thinkingLevelStr)
 
@@ -143,7 +147,11 @@ func NewAgentInstance(
 
 	contextWindow := defaults.ContextWindow
 	if contextWindow == 0 {
-		contextWindow = maxTokens
+		if maxContextSize > 0 {
+			contextWindow = maxContextSize
+		} else {
+			contextWindow = maxTokens
+		}
 	}
 
 	// Resolve fallback candidates
@@ -191,7 +199,7 @@ func NewAgentInstance(
 		return "", false
 	}
 
-	candidates := providers.ResolveCandidatesWithLookup(modelCfg, defaults.Provider, resolveFromModelList)
+	candidates := providers.ResolveCandidatesWithLookup(modelCfg, cfg.GetDefaultProviderName(), resolveFromModelList)
 
 	// Model routing setup: pre-resolve light model candidates at creation time
 	// to avoid repeated model_list lookups on every incoming message.
@@ -199,7 +207,7 @@ func NewAgentInstance(
 	var lightCandidates []providers.FallbackCandidate
 	if rc := defaults.Routing; rc != nil && rc.Enabled && rc.LightModel != "" {
 		lightModelCfg := providers.ModelConfig{Primary: rc.LightModel}
-		resolved := providers.ResolveCandidatesWithLookup(lightModelCfg, defaults.Provider, resolveFromModelList)
+		resolved := providers.ResolveCandidatesWithLookup(lightModelCfg, cfg.GetDefaultProviderName(), resolveFromModelList)
 		if len(resolved) > 0 {
 			router = routing.New(routing.RouterConfig{
 				LightModel: rc.LightModel,
@@ -252,9 +260,12 @@ func resolveAgentWorkspace(agentCfg *config.AgentConfig, defaults *config.AgentD
 }
 
 // resolveAgentModel resolves the primary model for an agent.
-func resolveAgentModel(agentCfg *config.AgentConfig, defaults *config.AgentDefaults) string {
+func resolveAgentModel(agentCfg *config.AgentConfig, defaults *config.AgentDefaults, cfg *config.Config) string {
 	if agentCfg != nil && agentCfg.Model != nil && strings.TrimSpace(agentCfg.Model.Primary) != "" {
 		return strings.TrimSpace(agentCfg.Model.Primary)
+	}
+	if cfg != nil && strings.TrimSpace(cfg.GetDefaultModelName()) != "" {
+		return strings.TrimSpace(cfg.GetDefaultModelName())
 	}
 	return defaults.GetModelName()
 }

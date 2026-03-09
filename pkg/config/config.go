@@ -48,41 +48,67 @@ func (f *FlexibleStringSlice) UnmarshalJSON(data []byte) error {
 }
 
 type Config struct {
-	Agents    AgentsConfig    `json:"agents"`
-	Bindings  []AgentBinding  `json:"bindings,omitempty"`
-	Session   SessionConfig   `json:"session,omitempty"`
-	Channels  ChannelsConfig  `json:"channels"`
-	Providers ProvidersConfig `json:"providers,omitempty"`
-	ModelList []ModelConfig   `json:"model_list"` // New model-centric provider configuration
-	Gateway   GatewayConfig   `json:"gateway"`
-	Tools     ToolsConfig     `json:"tools"`
-	Heartbeat HeartbeatConfig `json:"heartbeat"`
-	Devices   DevicesConfig   `json:"devices"`
+	DefaultModel string            `json:"default_model,omitempty"`
+	LoopControl  LoopControlConfig `json:"loop_control,omitempty"`
+	Agents       AgentsConfig      `json:"agents"`
+	Bindings     []AgentBinding    `json:"bindings,omitempty"`
+	Session      SessionConfig     `json:"session,omitempty"`
+	Channels     ChannelsConfig    `json:"channels"`
+	Providers    ProvidersConfig   `json:"providers,omitempty"`
+	Models       ModelsConfig      `json:"models,omitempty"`
+	ModelList    []ModelConfig     `json:"model_list,omitempty"` // Deprecated: legacy model-centric provider configuration
+	Gateway      GatewayConfig     `json:"gateway"`
+	Tools        ToolsConfig       `json:"tools"`
+	Heartbeat    HeartbeatConfig   `json:"heartbeat"`
+	Devices      DevicesConfig     `json:"devices"`
 }
 
 // MarshalJSON implements custom JSON marshaling for Config
-// to omit providers section when empty and session when empty
+// to omit providers/session when empty and prefer the new models layout.
 func (c Config) MarshalJSON() ([]byte, error) {
-	type Alias Config
-	aux := &struct {
-		Providers *ProvidersConfig `json:"providers,omitempty"`
-		Session   *SessionConfig   `json:"session,omitempty"`
-		*Alias
-	}{
-		Alias: (*Alias)(&c),
+	type marshaledConfig struct {
+		DefaultModel string             `json:"default_model,omitempty"`
+		LoopControl  *LoopControlConfig `json:"loop_control,omitempty"`
+		Agents       AgentsConfig       `json:"agents"`
+		Bindings     []AgentBinding     `json:"bindings,omitempty"`
+		Session      *SessionConfig     `json:"session,omitempty"`
+		Channels     ChannelsConfig     `json:"channels"`
+		Providers    *ProvidersConfig   `json:"providers,omitempty"`
+		Models       ModelsConfig       `json:"models,omitempty"`
+		ModelList    []ModelConfig      `json:"model_list,omitempty"`
+		Gateway      GatewayConfig      `json:"gateway"`
+		Tools        ToolsConfig        `json:"tools"`
+		Heartbeat    HeartbeatConfig    `json:"heartbeat"`
+		Devices      DevicesConfig      `json:"devices"`
 	}
 
-	// Only include providers if not empty
-	if !c.Providers.IsEmpty() {
-		aux.Providers = &c.Providers
+	out := marshaledConfig{
+		DefaultModel: c.DefaultModel,
+		Agents:       c.Agents,
+		Bindings:     c.Bindings,
+		Channels:     c.Channels,
+		Gateway:      c.Gateway,
+		Tools:        c.Tools,
+		Heartbeat:    c.Heartbeat,
+		Devices:      c.Devices,
 	}
 
-	// Only include session if not empty
+	if !c.LoopControl.IsEmpty() {
+		out.LoopControl = &c.LoopControl
+	}
 	if c.Session.DMScope != "" || len(c.Session.IdentityLinks) > 0 {
-		aux.Session = &c.Session
+		out.Session = &c.Session
+	}
+	if !c.Providers.IsEmpty() {
+		out.Providers = &c.Providers
+	}
+	if len(c.Models) > 0 {
+		out.Models = c.Models
+	} else if len(c.ModelList) > 0 {
+		out.ModelList = c.ModelList
 	}
 
-	return json.Marshal(aux)
+	return json.Marshal(out)
 }
 
 type AgentsConfig struct {
@@ -165,6 +191,19 @@ type AgentBinding struct {
 type SessionConfig struct {
 	DMScope       string              `json:"dm_scope,omitempty"`
 	IdentityLinks map[string][]string `json:"identity_links,omitempty"`
+}
+
+// LoopControlConfig controls per-turn agent execution limits.
+// It mirrors the top-level shape used by modern model CLIs while keeping
+// backward compatibility with agents.defaults.max_tool_iterations.
+type LoopControlConfig struct {
+	MaxStepsPerTurn   int `json:"max_steps_per_turn,omitempty"`
+	MaxRetriesPerStep int `json:"max_retries_per_step,omitempty"`
+	ReservedContext   int `json:"reserved_context_size,omitempty"`
+}
+
+func (c LoopControlConfig) IsEmpty() bool {
+	return c.MaxStepsPerTurn == 0 && c.MaxRetriesPerStep == 0 && c.ReservedContext == 0
 }
 
 // RoutingConfig controls the intelligent model routing feature.
@@ -313,53 +352,39 @@ type DevicesConfig struct {
 }
 
 type ProvidersConfig struct {
-	Anthropic     ProviderConfig       `json:"anthropic"`
-	OpenAI        OpenAIProviderConfig `json:"openai"`
-	LiteLLM       ProviderConfig       `json:"litellm"`
-	OpenRouter    ProviderConfig       `json:"openrouter"`
-	Groq          ProviderConfig       `json:"groq"`
-	Zhipu         ProviderConfig       `json:"zhipu"`
-	VLLM          ProviderConfig       `json:"vllm"`
-	Gemini        ProviderConfig       `json:"gemini"`
-	Nvidia        ProviderConfig       `json:"nvidia"`
-	Ollama        ProviderConfig       `json:"ollama"`
-	Moonshot      ProviderConfig       `json:"moonshot"`
-	ShengSuanYun  ProviderConfig       `json:"shengsuanyun"`
-	DeepSeek      ProviderConfig       `json:"deepseek"`
-	Cerebras      ProviderConfig       `json:"cerebras"`
-	Vivgrid       ProviderConfig       `json:"vivgrid"`
-	VolcEngine    ProviderConfig       `json:"volcengine"`
-	GitHubCopilot ProviderConfig       `json:"github_copilot"`
-	Antigravity   ProviderConfig       `json:"antigravity"`
-	Qwen          ProviderConfig       `json:"qwen"`
-	Mistral       ProviderConfig       `json:"mistral"`
-	Avian         ProviderConfig       `json:"avian"`
+	Anthropic     ProviderConfig            `json:"-"`
+	OpenAI        ProviderConfig            `json:"-"`
+	LiteLLM       ProviderConfig            `json:"-"`
+	OpenRouter    ProviderConfig            `json:"-"`
+	Groq          ProviderConfig            `json:"-"`
+	Zhipu         ProviderConfig            `json:"-"`
+	VLLM          ProviderConfig            `json:"-"`
+	Gemini        ProviderConfig            `json:"-"`
+	Nvidia        ProviderConfig            `json:"-"`
+	Ollama        ProviderConfig            `json:"-"`
+	Moonshot      ProviderConfig            `json:"-"`
+	ShengSuanYun  ProviderConfig            `json:"-"`
+	DeepSeek      ProviderConfig            `json:"-"`
+	Cerebras      ProviderConfig            `json:"-"`
+	Vivgrid       ProviderConfig            `json:"-"`
+	VolcEngine    ProviderConfig            `json:"-"`
+	GitHubCopilot ProviderConfig            `json:"-"`
+	Antigravity   ProviderConfig            `json:"-"`
+	Qwen          ProviderConfig            `json:"-"`
+	Mistral       ProviderConfig            `json:"-"`
+	Avian         ProviderConfig            `json:"-"`
+	Named         map[string]ProviderConfig `json:"-"`
 }
 
 // IsEmpty checks if all provider configs are empty (no API keys or API bases set)
-// Note: WebSearch is an optimization option and doesn't count as "non-empty"
+// Note: WebSearch is an optimization option and doesn't count as "non-empty".
 func (p ProvidersConfig) IsEmpty() bool {
-	return p.Anthropic.APIKey == "" && p.Anthropic.APIBase == "" &&
-		p.OpenAI.APIKey == "" && p.OpenAI.APIBase == "" &&
-		p.LiteLLM.APIKey == "" && p.LiteLLM.APIBase == "" &&
-		p.OpenRouter.APIKey == "" && p.OpenRouter.APIBase == "" &&
-		p.Groq.APIKey == "" && p.Groq.APIBase == "" &&
-		p.Zhipu.APIKey == "" && p.Zhipu.APIBase == "" &&
-		p.VLLM.APIKey == "" && p.VLLM.APIBase == "" &&
-		p.Gemini.APIKey == "" && p.Gemini.APIBase == "" &&
-		p.Nvidia.APIKey == "" && p.Nvidia.APIBase == "" &&
-		p.Ollama.APIKey == "" && p.Ollama.APIBase == "" &&
-		p.Moonshot.APIKey == "" && p.Moonshot.APIBase == "" &&
-		p.ShengSuanYun.APIKey == "" && p.ShengSuanYun.APIBase == "" &&
-		p.DeepSeek.APIKey == "" && p.DeepSeek.APIBase == "" &&
-		p.Cerebras.APIKey == "" && p.Cerebras.APIBase == "" &&
-		p.Vivgrid.APIKey == "" && p.Vivgrid.APIBase == "" &&
-		p.VolcEngine.APIKey == "" && p.VolcEngine.APIBase == "" &&
-		p.GitHubCopilot.APIKey == "" && p.GitHubCopilot.APIBase == "" &&
-		p.Antigravity.APIKey == "" && p.Antigravity.APIBase == "" &&
-		p.Qwen.APIKey == "" && p.Qwen.APIBase == "" &&
-		p.Mistral.APIKey == "" && p.Mistral.APIBase == "" &&
-		p.Avian.APIKey == "" && p.Avian.APIBase == ""
+	for _, cfg := range p.All() {
+		if !cfg.IsZero() {
+			return false
+		}
+	}
+	return true
 }
 
 // MarshalJSON implements custom JSON marshaling for ProvidersConfig
@@ -368,33 +393,269 @@ func (p ProvidersConfig) MarshalJSON() ([]byte, error) {
 	if p.IsEmpty() {
 		return []byte("null"), nil
 	}
-	type Alias ProvidersConfig
-	return json.Marshal((*Alias)(&p))
+	return json.Marshal(p.All())
+}
+
+func (p *ProvidersConfig) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" || len(data) == 0 {
+		return nil
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	if p.Named == nil {
+		p.Named = make(map[string]ProviderConfig)
+	}
+
+	for name, payload := range raw {
+		if name == "_comment" {
+			continue
+		}
+		cfg := p.Get(name)
+		if err := json.Unmarshal(payload, &cfg); err != nil {
+			return fmt.Errorf("providers.%s: %w", name, err)
+		}
+		if cfg.Type == "" {
+			cfg.Type = NormalizeProviderName(name)
+		}
+		p.Set(name, cfg)
+	}
+	return nil
+}
+
+func (p ProvidersConfig) All() map[string]ProviderConfig {
+	all := map[string]ProviderConfig{}
+	appendIfConfigured := func(name string, cfg ProviderConfig) {
+		if cfg.IsZero() && cfg.Type == "" {
+			return
+		}
+		if cfg.Type == "" {
+			cfg.Type = NormalizeProviderName(name)
+		}
+		all[name] = cfg
+	}
+
+	if len(p.Named) > 0 {
+		for name, cfg := range p.Named {
+			appendIfConfigured(name, cfg)
+		}
+		return all
+	}
+
+	appendIfConfigured("anthropic", p.Anthropic)
+	appendIfConfigured("openai", p.OpenAI)
+	appendIfConfigured("litellm", p.LiteLLM)
+	appendIfConfigured("openrouter", p.OpenRouter)
+	appendIfConfigured("groq", p.Groq)
+	appendIfConfigured("zhipu", p.Zhipu)
+	appendIfConfigured("vllm", p.VLLM)
+	appendIfConfigured("gemini", p.Gemini)
+	appendIfConfigured("nvidia", p.Nvidia)
+	appendIfConfigured("ollama", p.Ollama)
+	appendIfConfigured("moonshot", p.Moonshot)
+	appendIfConfigured("shengsuanyun", p.ShengSuanYun)
+	appendIfConfigured("deepseek", p.DeepSeek)
+	appendIfConfigured("cerebras", p.Cerebras)
+	appendIfConfigured("vivgrid", p.Vivgrid)
+	appendIfConfigured("volcengine", p.VolcEngine)
+	appendIfConfigured("github_copilot", p.GitHubCopilot)
+	appendIfConfigured("antigravity", p.Antigravity)
+	appendIfConfigured("qwen", p.Qwen)
+	appendIfConfigured("mistral", p.Mistral)
+	appendIfConfigured("avian", p.Avian)
+	return all
+}
+
+func (p ProvidersConfig) Get(name string) ProviderConfig {
+	name = NormalizeProviderName(name)
+	switch name {
+	case "anthropic":
+		return p.Anthropic
+	case "openai":
+		return p.OpenAI
+	case "litellm":
+		return p.LiteLLM
+	case "openrouter":
+		return p.OpenRouter
+	case "groq":
+		return p.Groq
+	case "zhipu":
+		return p.Zhipu
+	case "vllm":
+		return p.VLLM
+	case "gemini":
+		return p.Gemini
+	case "nvidia":
+		return p.Nvidia
+	case "ollama":
+		return p.Ollama
+	case "moonshot":
+		return p.Moonshot
+	case "shengsuanyun":
+		return p.ShengSuanYun
+	case "deepseek":
+		return p.DeepSeek
+	case "cerebras":
+		return p.Cerebras
+	case "vivgrid":
+		return p.Vivgrid
+	case "volcengine":
+		return p.VolcEngine
+	case "github_copilot":
+		return p.GitHubCopilot
+	case "antigravity":
+		return p.Antigravity
+	case "qwen":
+		return p.Qwen
+	case "mistral":
+		return p.Mistral
+	case "avian":
+		return p.Avian
+	default:
+		if p.Named == nil {
+			return ProviderConfig{}
+		}
+		return p.Named[name]
+	}
+}
+
+func (p *ProvidersConfig) Set(name string, cfg ProviderConfig) {
+	name = NormalizeProviderName(name)
+	if p.Named == nil {
+		p.Named = make(map[string]ProviderConfig)
+	}
+	p.Named[name] = cfg
+
+	switch name {
+	case "anthropic":
+		p.Anthropic = cfg
+	case "openai":
+		p.OpenAI = cfg
+	case "litellm":
+		p.LiteLLM = cfg
+	case "openrouter":
+		p.OpenRouter = cfg
+	case "groq":
+		p.Groq = cfg
+	case "zhipu":
+		p.Zhipu = cfg
+	case "vllm":
+		p.VLLM = cfg
+	case "gemini":
+		p.Gemini = cfg
+	case "nvidia":
+		p.Nvidia = cfg
+	case "ollama":
+		p.Ollama = cfg
+	case "moonshot":
+		p.Moonshot = cfg
+	case "shengsuanyun":
+		p.ShengSuanYun = cfg
+	case "deepseek":
+		p.DeepSeek = cfg
+	case "cerebras":
+		p.Cerebras = cfg
+	case "vivgrid":
+		p.Vivgrid = cfg
+	case "volcengine":
+		p.VolcEngine = cfg
+	case "github_copilot":
+		p.GitHubCopilot = cfg
+	case "antigravity":
+		p.Antigravity = cfg
+	case "qwen":
+		p.Qwen = cfg
+	case "mistral":
+		p.Mistral = cfg
+	case "avian":
+		p.Avian = cfg
+	}
 }
 
 type ProviderConfig struct {
+	Type           string `json:"type,omitempty"`
 	APIKey         string `json:"api_key"                   env:"PICOCLAW_PROVIDERS_{{.Name}}_API_KEY"`
 	APIBase        string `json:"api_base"                  env:"PICOCLAW_PROVIDERS_{{.Name}}_API_BASE"`
 	Proxy          string `json:"proxy,omitempty"           env:"PICOCLAW_PROVIDERS_{{.Name}}_PROXY"`
 	RequestTimeout int    `json:"request_timeout,omitempty" env:"PICOCLAW_PROVIDERS_{{.Name}}_REQUEST_TIMEOUT"`
 	AuthMethod     string `json:"auth_method,omitempty"     env:"PICOCLAW_PROVIDERS_{{.Name}}_AUTH_METHOD"`
 	ConnectMode    string `json:"connect_mode,omitempty"    env:"PICOCLAW_PROVIDERS_{{.Name}}_CONNECT_MODE"` // only for Github Copilot, `stdio` or `grpc`
+	Workspace      string `json:"workspace,omitempty"`
+	WebSearch      bool   `json:"web_search,omitempty"      env:"PICOCLAW_PROVIDERS_OPENAI_WEB_SEARCH"`
 }
 
-type OpenAIProviderConfig struct {
-	ProviderConfig
-	WebSearch bool `json:"web_search" env:"PICOCLAW_PROVIDERS_OPENAI_WEB_SEARCH"`
+func (c *ProviderConfig) UnmarshalJSON(data []byte) error {
+	type alias ProviderConfig
+	var raw struct {
+		alias
+		BaseURL string `json:"base_url,omitempty"`
+	}
+	raw.alias = alias(*c)
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*c = ProviderConfig(raw.alias)
+	if c.APIBase == "" && raw.BaseURL != "" {
+		c.APIBase = raw.BaseURL
+	}
+	return nil
 }
 
-// ModelConfig represents a model-centric provider configuration.
-// It allows adding new providers (especially OpenAI-compatible ones) via configuration only.
-// The model field uses protocol prefix format: [protocol/]model-identifier
-// Supported protocols: openai, anthropic, antigravity, claude-cli, codex-cli, github-copilot
-// Default protocol is "openai" if no prefix is specified.
+func (c ProviderConfig) IsZero() bool {
+	return c.APIKey == "" &&
+		c.APIBase == "" &&
+		c.Proxy == "" &&
+		c.RequestTimeout == 0 &&
+		c.AuthMethod == "" &&
+		c.ConnectMode == "" &&
+		c.Workspace == ""
+}
+
+type ModelsConfig map[string]ModelVariants
+
+type ModelVariants []ModelDefinition
+
+func (v *ModelVariants) UnmarshalJSON(data []byte) error {
+	var single ModelDefinition
+	if err := json.Unmarshal(data, &single); err == nil && single.Provider != "" {
+		*v = ModelVariants{single}
+		return nil
+	}
+
+	var many []ModelDefinition
+	if err := json.Unmarshal(data, &many); err != nil {
+		return err
+	}
+	*v = ModelVariants(many)
+	return nil
+}
+
+func (v ModelVariants) MarshalJSON() ([]byte, error) {
+	if len(v) == 1 {
+		return json.Marshal(v[0])
+	}
+	return json.Marshal([]ModelDefinition(v))
+}
+
+type ModelDefinition struct {
+	Provider       string   `json:"provider"`
+	Model          string   `json:"model"`
+	RPM            int      `json:"rpm,omitempty"`
+	MaxTokensField string   `json:"max_tokens_field,omitempty"`
+	MaxContextSize int      `json:"max_context_size,omitempty"`
+	ThinkingLevel  string   `json:"thinking_level,omitempty"`
+	Capabilities   []string `json:"capabilities,omitempty"`
+}
+
+// ModelConfig is the resolved provider+model configuration used internally.
 type ModelConfig struct {
 	// Required fields
-	ModelName string `json:"model_name"` // User-facing alias for the model
-	Model     string `json:"model"`      // Protocol/model-identifier (e.g., "openai/gpt-4o", "anthropic/claude-sonnet-4.6")
+	ModelName string `json:"model_name"`         // User-facing alias for the model
+	Provider  string `json:"provider,omitempty"` // Named provider entry for new-style config
+	Model     string `json:"model"`              // Protocol/model-identifier (e.g., "openai/gpt-4o", "anthropic/claude-sonnet-4.6")
 
 	// HTTP-based providers
 	APIBase string `json:"api_base,omitempty"` // API endpoint URL
@@ -410,6 +671,7 @@ type ModelConfig struct {
 	RPM            int    `json:"rpm,omitempty"`              // Requests per minute limit
 	MaxTokensField string `json:"max_tokens_field,omitempty"` // Field name for max tokens (e.g., "max_completion_tokens")
 	RequestTimeout int    `json:"request_timeout,omitempty"`
+	MaxContextSize int    `json:"max_context_size,omitempty"`
 	ThinkingLevel  string `json:"thinking_level,omitempty"` // Extended thinking: off|low|medium|high|xhigh|adaptive
 }
 
@@ -605,6 +867,10 @@ func LoadConfig(path string) (*Config, error) {
 	if err := json.Unmarshal(data, &tmp); err != nil {
 		return nil, err
 	}
+	if len(tmp.Models) > 0 {
+		cfg.Models = nil
+		cfg.ModelList = nil
+	}
 	if len(tmp.ModelList) > 0 {
 		cfg.ModelList = nil
 	}
@@ -617,12 +883,24 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, err
 	}
 
+	cfg.ApplyCompatibilityDefaults()
+
 	// Migrate legacy channel config fields to new unified structures
 	cfg.migrateChannelConfigs()
 
-	// Auto-migrate: if only legacy providers config exists, convert to model_list
-	if len(cfg.ModelList) == 0 && cfg.HasProvidersConfig() {
+	switch {
+	case len(cfg.Models) > 0:
+		cfg.ModelList, err = cfg.ResolveModelListFromModels()
+		if err != nil {
+			return nil, err
+		}
+	case len(cfg.ModelList) > 0:
+		if cfg.Models == nil {
+			cfg.Providers, cfg.Models = ConvertModelListToSeparatedConfig(cfg.ModelList)
+		}
+	case cfg.HasProvidersConfig():
 		cfg.ModelList = ConvertProvidersToModelList(cfg)
+		cfg.Providers, cfg.Models = ConvertModelListToSeparatedConfig(cfg.ModelList)
 	}
 
 	// Validate model_list for uniqueness and required fields
@@ -656,48 +934,39 @@ func (c *Config) WorkspacePath() string {
 }
 
 func (c *Config) GetAPIKey() string {
-	if c.Providers.OpenRouter.APIKey != "" {
-		return c.Providers.OpenRouter.APIKey
+	for _, name := range []string{
+		"openrouter", "anthropic", "openai", "gemini", "zhipu", "groq",
+		"vllm", "shengsuanyun", "cerebras",
+	} {
+		if key := c.Providers.Get(name).APIKey; key != "" {
+			return key
+		}
 	}
-	if c.Providers.Anthropic.APIKey != "" {
-		return c.Providers.Anthropic.APIKey
-	}
-	if c.Providers.OpenAI.APIKey != "" {
-		return c.Providers.OpenAI.APIKey
-	}
-	if c.Providers.Gemini.APIKey != "" {
-		return c.Providers.Gemini.APIKey
-	}
-	if c.Providers.Zhipu.APIKey != "" {
-		return c.Providers.Zhipu.APIKey
-	}
-	if c.Providers.Groq.APIKey != "" {
-		return c.Providers.Groq.APIKey
-	}
-	if c.Providers.VLLM.APIKey != "" {
-		return c.Providers.VLLM.APIKey
-	}
-	if c.Providers.ShengSuanYun.APIKey != "" {
-		return c.Providers.ShengSuanYun.APIKey
-	}
-	if c.Providers.Cerebras.APIKey != "" {
-		return c.Providers.Cerebras.APIKey
+	for _, mc := range c.ModelList {
+		if mc.APIKey != "" {
+			return mc.APIKey
+		}
 	}
 	return ""
 }
 
 func (c *Config) GetAPIBase() string {
-	if c.Providers.OpenRouter.APIKey != "" {
-		if c.Providers.OpenRouter.APIBase != "" {
-			return c.Providers.OpenRouter.APIBase
+	if p := c.Providers.Get("openrouter"); p.APIKey != "" {
+		if p.APIBase != "" {
+			return p.APIBase
 		}
 		return "https://openrouter.ai/api/v1"
 	}
-	if c.Providers.Zhipu.APIKey != "" {
-		return c.Providers.Zhipu.APIBase
+	if p := c.Providers.Get("zhipu"); p.APIKey != "" {
+		return p.APIBase
 	}
-	if c.Providers.VLLM.APIKey != "" && c.Providers.VLLM.APIBase != "" {
-		return c.Providers.VLLM.APIBase
+	if p := c.Providers.Get("vllm"); p.APIKey != "" && p.APIBase != "" {
+		return p.APIBase
+	}
+	for _, mc := range c.ModelList {
+		if mc.APIBase != "" {
+			return mc.APIBase
+		}
 	}
 	return ""
 }
@@ -722,7 +991,7 @@ func expandHome(path string) string {
 func (c *Config) GetModelConfig(modelName string) (*ModelConfig, error) {
 	matches := c.findMatches(modelName)
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("model %q not found in model_list or providers", modelName)
+		return nil, fmt.Errorf("model %q not found in models, model_list, or providers", modelName)
 	}
 	if len(matches) == 1 {
 		return &matches[0], nil

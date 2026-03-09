@@ -167,7 +167,7 @@ func (t *GroqTranscriber) Name() string {
 // nil if no supported transcription provider is configured.
 func DetectTranscriber(cfg *config.Config) Transcriber {
 	// Direct Groq provider config takes priority.
-	if key := cfg.Providers.Groq.APIKey; key != "" {
+	if key := cfg.Providers.Get("groq").APIKey; key != "" {
 		return NewGroqTranscriber(key)
 	}
 	// Fall back to any model-list entry that uses the groq/ protocol.

@@ -1731,7 +1731,15 @@ func (al *AgentLoop) buildCommandsRuntime(agent *AgentInstance) *commands.Runtim
 	}
 	if agent != nil {
 		rt.GetModelInfo = func() (string, string) {
-			return agent.Model, al.cfg.Agents.Defaults.Provider
+			providerName := al.cfg.GetDefaultProviderName()
+			if mc, err := al.cfg.GetModelConfig(agent.Model); err == nil && mc != nil {
+				if mc.Provider != "" {
+					providerName = mc.Provider
+				} else {
+					providerName, _ = providers.ExtractProtocol(mc.Model)
+				}
+			}
+			return agent.Model, providerName
 		}
 		rt.SwitchModel = func(value string) (string, error) {
 			oldModel := agent.Model

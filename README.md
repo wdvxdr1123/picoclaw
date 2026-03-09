@@ -228,28 +228,39 @@ picoclaw onboard
 
 ```json
 {
+  "default_model": "gpt4",
+  "loop_control": {
+    "max_steps_per_turn": 20
+  },
   "agents": {
     "defaults": {
       "workspace": "~/.picoclaw/workspace",
-      "model_name": "gpt4",
       "max_tokens": 8192,
       "temperature": 0.7,
-      "max_tool_iterations": 20
+      "restrict_to_workspace": true
     }
   },
-  "model_list": [
-    {
-      "model_name": "gpt4",
-      "model": "openai/gpt-5.2",
+  "providers": {
+    "openai": {
+      "type": "openai",
       "api_key": "your-api-key",
       "request_timeout": 300
     },
-    {
-      "model_name": "claude-sonnet-4.6",
-      "model": "anthropic/claude-sonnet-4.6",
+    "anthropic": {
+      "type": "anthropic",
       "api_key": "your-anthropic-key"
     }
-  ],
+  },
+  "models": {
+    "gpt4": {
+      "provider": "openai",
+      "model": "gpt-5.2"
+    },
+    "claude-sonnet-4.6": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4.6"
+    }
+  },
   "tools": {
     "web": {
       "brave": {
@@ -281,7 +292,7 @@ picoclaw onboard
 }
 ```
 
-> **New**: The `model_list` configuration format allows zero-code provider addition. See [Model Configuration](#model-configuration-model_list) for details.
+> **New**: PicoClaw now separates `providers` and `models`. See the Provider and Model Configuration section below for details.
 > `request_timeout` is optional and uses seconds. If omitted or set to `<= 0`, PicoClaw uses the default timeout (120s).
 
 **3. Get API Keys**
@@ -954,16 +965,11 @@ The subagent has access to tools (message, web_search, etc.) and can communicate
 | `cerebras`                 | LLM (Cerebras direct)                   | [cerebras.ai](https://cerebras.ai)                                   |
 | `vivgrid`                  | LLM (Vivgrid direct)                    | [vivgrid.com](https://vivgrid.com)                                   |
 
-### Model Configuration (model_list)
+### Provider and Model Configuration
 
-> **What's New?** PicoClaw now uses a **model-centric** configuration approach. Simply specify `vendor/model` format (e.g., `zhipu/glm-4.7`) to add new providers—**zero code changes required!**
+> **What's New?** PicoClaw now uses separated `providers` and `models`. Reuse a named provider across many aliases, set `default_model` at the top level, and configure shared limits with `loop_control`.
 
-This design also enables **multi-agent support** with flexible provider selection:
-
-- **Different agents, different providers**: Each agent can use its own LLM provider
-- **Model fallbacks**: Configure primary and fallback models for resilience
-- **Load balancing**: Distribute requests across multiple endpoints
-- **Centralized configuration**: Manage all providers in one place
+This design keeps provider reuse, multi-agent model selection, and load balancing in one shared configuration graph.
 
 #### 📋 All Supported Vendors
 
@@ -993,26 +999,33 @@ This design also enables **multi-agent support** with flexible provider selectio
 
 ```json
 {
-  "model_list": [
-    {
-      "model_name": "gpt-5.2",
-      "model": "openai/gpt-5.2",
+  "default_model": "gpt-5.2",
+  "providers": {
+    "openai": {
+      "type": "openai",
       "api_key": "sk-your-openai-key"
     },
-    {
-      "model_name": "claude-sonnet-4.6",
-      "model": "anthropic/claude-sonnet-4.6",
+    "anthropic": {
+      "type": "anthropic",
       "api_key": "sk-ant-your-key"
     },
-    {
-      "model_name": "glm-4.7",
-      "model": "zhipu/glm-4.7",
+    "zhipu": {
+      "type": "zhipu",
       "api_key": "your-zhipu-key"
     }
-  ],
-  "agents": {
-    "defaults": {
+  },
+  "models": {
+    "gpt-5.2": {
+      "provider": "openai",
       "model": "gpt-5.2"
+    },
+    "claude-sonnet-4.6": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4.6"
+    },
+    "glm-4.7": {
+      "provider": "zhipu",
+      "model": "glm-4.7"
     }
   }
 }
@@ -1024,9 +1037,18 @@ This design also enables **multi-agent support** with flexible provider selectio
 
 ```json
 {
-  "model_name": "gpt-5.2",
-  "model": "openai/gpt-5.2",
-  "api_key": "sk-..."
+  "providers": {
+    "openai": {
+      "type": "openai",
+      "api_key": "sk-..."
+    }
+  },
+  "models": {
+    "gpt-5.2": {
+      "provider": "openai",
+      "model": "gpt-5.2"
+    }
+  }
 }
 ```
 
@@ -1034,9 +1056,18 @@ This design also enables **multi-agent support** with flexible provider selectio
 
 ```json
 {
-  "model_name": "glm-4.7",
-  "model": "zhipu/glm-4.7",
-  "api_key": "your-key"
+  "providers": {
+    "zhipu": {
+      "type": "zhipu",
+      "api_key": "your-key"
+    }
+  },
+  "models": {
+    "glm-4.7": {
+      "provider": "zhipu",
+      "model": "glm-4.7"
+    }
+  }
 }
 ```
 
@@ -1044,9 +1075,18 @@ This design also enables **multi-agent support** with flexible provider selectio
 
 ```json
 {
-  "model_name": "deepseek-chat",
-  "model": "deepseek/deepseek-chat",
-  "api_key": "sk-..."
+  "providers": {
+    "deepseek": {
+      "type": "deepseek",
+      "api_key": "sk-..."
+    }
+  },
+  "models": {
+    "deepseek-chat": {
+      "provider": "deepseek",
+      "model": "deepseek-chat"
+    }
+  }
 }
 ```
 
@@ -1054,9 +1094,18 @@ This design also enables **multi-agent support** with flexible provider selectio
 
 ```json
 {
-  "model_name": "claude-sonnet-4.6",
-  "model": "anthropic/claude-sonnet-4.6",
-  "api_key": "sk-ant-your-key"
+  "providers": {
+    "anthropic": {
+      "type": "anthropic",
+      "api_key": "sk-ant-your-key"
+    }
+  },
+  "models": {
+    "claude-sonnet-4.6": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4.6"
+    }
+  }
 }
 ```
 
@@ -1066,8 +1115,18 @@ This design also enables **multi-agent support** with flexible provider selectio
 
 ```json
 {
-  "model_name": "llama3",
-  "model": "ollama/llama3"
+  "providers": {
+    "ollama": {
+      "type": "ollama",
+      "api_base": "http://localhost:11434/v1"
+    }
+  },
+  "models": {
+    "llama3": {
+      "provider": "ollama",
+      "model": "llama3"
+    }
+  }
 }
 ```
 
@@ -1075,11 +1134,20 @@ This design also enables **multi-agent support** with flexible provider selectio
 
 ```json
 {
-  "model_name": "my-custom-model",
-  "model": "openai/custom-model",
-  "api_base": "https://my-proxy.com/v1",
-  "api_key": "sk-...",
-  "request_timeout": 300
+  "providers": {
+    "my-proxy": {
+      "type": "openai",
+      "api_base": "https://my-proxy.com/v1",
+      "api_key": "sk-...",
+      "request_timeout": 300
+    }
+  },
+  "models": {
+    "my-custom-model": {
+      "provider": "my-proxy",
+      "model": "custom-model"
+    }
+  }
 }
 ```
 
@@ -1087,10 +1155,19 @@ This design also enables **multi-agent support** with flexible provider selectio
 
 ```json
 {
-  "model_name": "lite-gpt4",
-  "model": "litellm/lite-gpt4",
-  "api_base": "http://localhost:4000/v1",
-  "api_key": "sk-..."
+  "providers": {
+    "litellm": {
+      "type": "litellm",
+      "api_base": "http://localhost:4000/v1",
+      "api_key": "sk-..."
+    }
+  },
+  "models": {
+    "lite-gpt4": {
+      "provider": "litellm",
+      "model": "lite-gpt4"
+    }
+  }
 }
 ```
 
@@ -1102,20 +1179,30 @@ Configure multiple endpoints for the same model name—PicoClaw will automatical
 
 ```json
 {
-  "model_list": [
-    {
-      "model_name": "gpt-5.2",
-      "model": "openai/gpt-5.2",
+  "providers": {
+    "openai-primary": {
+      "type": "openai",
       "api_base": "https://api1.example.com/v1",
       "api_key": "sk-key1"
     },
-    {
-      "model_name": "gpt-5.2",
-      "model": "openai/gpt-5.2",
+    "openai-secondary": {
+      "type": "openai",
       "api_base": "https://api2.example.com/v1",
       "api_key": "sk-key2"
     }
-  ]
+  },
+  "models": {
+    "gpt-5.2": [
+      {
+        "provider": "openai-primary",
+        "model": "gpt-5.2"
+      },
+      {
+        "provider": "openai-secondary",
+        "model": "gpt-5.2"
+      }
+    ]
+  }
 }
 ```
 
@@ -1146,15 +1233,16 @@ The old `providers` configuration is **deprecated** but still supported for back
 
 ```json
 {
-  "model_list": [
-    {
-      "model_name": "glm-4.7",
-      "model": "zhipu/glm-4.7",
+  "default_model": "glm-4.7",
+  "providers": {
+    "zhipu": {
+      "type": "zhipu",
       "api_key": "your-key"
     }
-  ],
-  "agents": {
-    "defaults": {
+  },
+  "models": {
+    "glm-4.7": {
+      "provider": "zhipu",
       "model": "glm-4.7"
     }
   }
