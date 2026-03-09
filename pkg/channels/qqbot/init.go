@@ -8,6 +8,6 @@ import (
 
 func init() {
 	channels.RegisterFactory("qqbot", func(cfg *config.Config, b *bus.MessageBus) (channels.Channel, error) {
-		return NewQQBotChannel(cfg.Channels.QQBot, b)
+		return NewQQChannel(cfg.Channels.QQBot, b)
 	})
 }
