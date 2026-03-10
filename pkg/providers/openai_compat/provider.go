@@ -34,6 +34,7 @@ type Provider struct {
 	apiBase        string
 	maxTokensField string // Field name for max tokens (e.g., "max_completion_tokens" for o1/glm models)
 	httpClient     *http.Client
+	userAgent      string // Custom User-Agent header value
 }
 
 type Option func(*Provider)
@@ -51,6 +52,12 @@ func WithRequestTimeout(timeout time.Duration) Option {
 		if timeout > 0 {
 			p.httpClient.Timeout = timeout
 		}
+	}
+}
+
+func WithUserAgent(userAgent string) Option {
+	return func(p *Provider) {
+		p.userAgent = userAgent
 	}
 }
 
@@ -244,6 +251,9 @@ func (p *Provider) Chat(
 	req.Header.Set("Content-Type", "application/json")
 	if p.apiKey != "" {
 		req.Header.Set("Authorization", "Bearer "+p.apiKey)
+	}
+	if p.userAgent != "" {
+		req.Header.Set("User-Agent", p.userAgent)
 	}
 
 	resp, err := p.httpClient.Do(req)
@@ -518,7 +528,7 @@ func normalizeModel(model, apiBase string) string {
 
 	prefix := strings.ToLower(before)
 	switch prefix {
-	case "litellm", "moonshot", "nvidia", "groq", "ollama", "deepseek", "google",
+	case "litellm", "kimi", "moonshot", "nvidia", "groq", "ollama", "deepseek", "google",
 		"openrouter", "zhipu", "mistral", "vivgrid":
 		return after
 	default:

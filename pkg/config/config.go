@@ -380,6 +380,7 @@ type ProvidersConfig struct {
 	Groq          ProviderConfig            `json:"-"`
 	Zhipu         ProviderConfig            `json:"-"`
 	VLLM          ProviderConfig            `json:"-"`
+	Kimi          ProviderConfig            `json:"-"`
 	Gemini        ProviderConfig            `json:"-"`
 	Nvidia        ProviderConfig            `json:"-"`
 	Ollama        ProviderConfig            `json:"-"`
@@ -476,6 +477,7 @@ func (p ProvidersConfig) All() map[string]ProviderConfig {
 	appendIfConfigured("gemini", p.Gemini)
 	appendIfConfigured("nvidia", p.Nvidia)
 	appendIfConfigured("ollama", p.Ollama)
+	appendIfConfigured("kimi", p.Kimi)
 	appendIfConfigured("moonshot", p.Moonshot)
 	appendIfConfigured("shengsuanyun", p.ShengSuanYun)
 	appendIfConfigured("deepseek", p.DeepSeek)
@@ -513,6 +515,8 @@ func (p ProvidersConfig) Get(name string) ProviderConfig {
 		return p.Nvidia
 	case "ollama":
 		return p.Ollama
+	case "kimi":
+		return p.Kimi
 	case "moonshot":
 		return p.Moonshot
 	case "shengsuanyun":
@@ -571,6 +575,8 @@ func (p *ProvidersConfig) Set(name string, cfg ProviderConfig) {
 		p.Nvidia = cfg
 	case "ollama":
 		p.Ollama = cfg
+	case "kimi":
+		p.Kimi = cfg
 	case "moonshot":
 		p.Moonshot = cfg
 	case "shengsuanyun":
@@ -724,54 +730,18 @@ type ToolConfig struct {
 	Enabled bool `json:"enabled" env:"ENABLED"`
 }
 
-type BraveConfig struct {
-	Enabled    bool   `json:"enabled"     env:"PICOCLAW_TOOLS_WEB_BRAVE_ENABLED"`
-	APIKey     string `json:"api_key"     env:"PICOCLAW_TOOLS_WEB_BRAVE_API_KEY"`
-	MaxResults int    `json:"max_results" env:"PICOCLAW_TOOLS_WEB_BRAVE_MAX_RESULTS"`
-}
-
-type TavilyConfig struct {
-	Enabled    bool   `json:"enabled"     env:"PICOCLAW_TOOLS_WEB_TAVILY_ENABLED"`
-	APIKey     string `json:"api_key"     env:"PICOCLAW_TOOLS_WEB_TAVILY_API_KEY"`
-	BaseURL    string `json:"base_url"    env:"PICOCLAW_TOOLS_WEB_TAVILY_BASE_URL"`
-	MaxResults int    `json:"max_results" env:"PICOCLAW_TOOLS_WEB_TAVILY_MAX_RESULTS"`
-}
-
-type DuckDuckGoConfig struct {
-	Enabled    bool `json:"enabled"     env:"PICOCLAW_TOOLS_WEB_DUCKDUCKGO_ENABLED"`
-	MaxResults int  `json:"max_results" env:"PICOCLAW_TOOLS_WEB_DUCKDUCKGO_MAX_RESULTS"`
-}
-
-type PerplexityConfig struct {
-	Enabled    bool   `json:"enabled"     env:"PICOCLAW_TOOLS_WEB_PERPLEXITY_ENABLED"`
-	APIKey     string `json:"api_key"     env:"PICOCLAW_TOOLS_WEB_PERPLEXITY_API_KEY"`
-	MaxResults int    `json:"max_results" env:"PICOCLAW_TOOLS_WEB_PERPLEXITY_MAX_RESULTS"`
-}
-
-type SearXNGConfig struct {
-	Enabled    bool   `json:"enabled"     env:"PICOCLAW_TOOLS_WEB_SEARXNG_ENABLED"`
-	BaseURL    string `json:"base_url"    env:"PICOCLAW_TOOLS_WEB_SEARXNG_BASE_URL"`
-	MaxResults int    `json:"max_results" env:"PICOCLAW_TOOLS_WEB_SEARXNG_MAX_RESULTS"`
-}
-
-type GLMSearchConfig struct {
-	Enabled bool   `json:"enabled"  env:"PICOCLAW_TOOLS_WEB_GLM_ENABLED"`
-	APIKey  string `json:"api_key"  env:"PICOCLAW_TOOLS_WEB_GLM_API_KEY"`
-	BaseURL string `json:"base_url" env:"PICOCLAW_TOOLS_WEB_GLM_BASE_URL"`
-	// SearchEngine specifies the search backend: "search_std" (default),
-	// "search_pro", "search_pro_sogou", or "search_pro_quark".
-	SearchEngine string `json:"search_engine" env:"PICOCLAW_TOOLS_WEB_GLM_SEARCH_ENGINE"`
-	MaxResults   int    `json:"max_results"   env:"PICOCLAW_TOOLS_WEB_GLM_MAX_RESULTS"`
+type OpenAISearchConfig struct {
+	Enabled bool   `json:"enabled"  env:"PICOCLAW_TOOLS_WEB_OPENAI_SEARCH_ENABLED"`
+	APIKey  string `json:"api_key"  env:"PICOCLAW_TOOLS_WEB_OPENAI_SEARCH_API_KEY"`
+	BaseURL string `json:"base_url" env:"PICOCLAW_TOOLS_WEB_OPENAI_SEARCH_BASE_URL"`
+	Model   string `json:"model"    env:"PICOCLAW_TOOLS_WEB_OPENAI_SEARCH_MODEL"`
 }
 
 type WebToolsConfig struct {
 	ToolConfig `                 envPrefix:"PICOCLAW_TOOLS_WEB_"`
-	Brave      BraveConfig      `                                json:"brave"`
-	Tavily     TavilyConfig     `                                json:"tavily"`
-	DuckDuckGo DuckDuckGoConfig `                                json:"duckduckgo"`
-	Perplexity PerplexityConfig `                                json:"perplexity"`
-	SearXNG    SearXNGConfig    `                                json:"searxng"`
-	GLMSearch  GLMSearchConfig  `                                json:"glm_search"`
+	// SearchProvider chooses the backend for web_search: auto or openai.
+	SearchProvider string             `json:"search_provider,omitempty" env:"PICOCLAW_TOOLS_WEB_SEARCH_PROVIDER"`
+	OpenAISearch   OpenAISearchConfig `json:"openai_search"`
 	// Proxy is an optional proxy URL for web tools (http/https/socks5/socks5h).
 	// For authenticated proxies, prefer HTTP_PROXY/HTTPS_PROXY env vars instead of embedding credentials in config.
 	Proxy           string `json:"proxy,omitempty"             env:"PICOCLAW_TOOLS_WEB_PROXY"`

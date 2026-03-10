@@ -264,15 +264,11 @@ func TestDefaultConfig_Channels(t *testing.T) {
 func TestDefaultConfig_WebTools(t *testing.T) {
 	cfg := DefaultConfig()
 
-	// Verify web tools defaults
-	if cfg.Tools.Web.Brave.MaxResults != 5 {
-		t.Error("Expected Brave MaxResults 5, got ", cfg.Tools.Web.Brave.MaxResults)
+	if cfg.Tools.Web.SearchProvider != "auto" {
+		t.Errorf("Expected Web.SearchProvider auto, got %q", cfg.Tools.Web.SearchProvider)
 	}
-	if cfg.Tools.Web.Brave.APIKey != "" {
-		t.Error("Brave API key should be empty by default")
-	}
-	if cfg.Tools.Web.DuckDuckGo.MaxResults != 5 {
-		t.Error("Expected DuckDuckGo MaxResults 5, got ", cfg.Tools.Web.DuckDuckGo.MaxResults)
+	if cfg.Tools.Web.OpenAISearch.Model != "" {
+		t.Errorf("Expected OpenAISearch.Model empty by default, got %q", cfg.Tools.Web.OpenAISearch.Model)
 	}
 }
 
@@ -426,6 +422,47 @@ func TestLoadConfig_WebToolsProxy(t *testing.T) {
 	}
 	if cfg.Tools.Web.Proxy != "http://127.0.0.1:7890" {
 		t.Fatalf("Tools.Web.Proxy = %q, want %q", cfg.Tools.Web.Proxy, "http://127.0.0.1:7890")
+	}
+}
+
+func TestLoadConfig_OpenAISearchConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+	configJSON := `{
+  "tools": {
+    "web": {
+      "search_provider": "openai",
+      "openai_search": {
+        "enabled": true,
+        "api_key": "search-key",
+        "base_url": "http://jeniya.cn/v1/chat/completions",
+        "model": "grok-4-fast"
+      }
+    }
+  }
+}`
+	if err := os.WriteFile(configPath, []byte(configJSON), 0o600); err != nil {
+		t.Fatalf("os.WriteFile() error: %v", err)
+	}
+
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadConfig() error: %v", err)
+	}
+	if cfg.Tools.Web.SearchProvider != "openai" {
+		t.Fatalf("Tools.Web.SearchProvider = %q, want %q", cfg.Tools.Web.SearchProvider, "openai")
+	}
+	if !cfg.Tools.Web.OpenAISearch.Enabled {
+		t.Fatal("Tools.Web.OpenAISearch.Enabled should be true")
+	}
+	if cfg.Tools.Web.OpenAISearch.APIKey != "search-key" {
+		t.Fatalf("OpenAISearch.APIKey = %q", cfg.Tools.Web.OpenAISearch.APIKey)
+	}
+	if cfg.Tools.Web.OpenAISearch.BaseURL != "http://jeniya.cn/v1/chat/completions" {
+		t.Fatalf("OpenAISearch.BaseURL = %q", cfg.Tools.Web.OpenAISearch.BaseURL)
+	}
+	if cfg.Tools.Web.OpenAISearch.Model != "grok-4-fast" {
+		t.Fatalf("OpenAISearch.Model = %q", cfg.Tools.Web.OpenAISearch.Model)
 	}
 }
 

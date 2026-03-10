@@ -20,28 +20,55 @@ PicoClaw's tools configuration is located in the `tools` field of `config.json`.
 
 Web tools are used for web search and fetching.
 
-### Brave
+### Search Provider Selection
 
-| Config        | Type   | Default | Description               |
-| ------------- | ------ | ------- | ------------------------- |
-| `enabled`     | bool   | false   | Enable Brave search       |
-| `api_key`     | string | -       | Brave Search API key      |
-| `max_results` | int    | 5       | Maximum number of results |
+| Config            | Type   | Default | Description                                       |
+| ----------------- | ------ | ------- | ------------------------------------------------- |
+| `search_provider` | string | `auto`  | Search backend for `web_search`: `auto`, `openai` |
 
-### DuckDuckGo
+When `search_provider` is `auto`, PicoClaw enables `web_search` only when `openai_search` is fully configured.
 
-| Config        | Type | Default | Description               |
-| ------------- | ---- | ------- | ------------------------- |
-| `enabled`     | bool | true    | Enable DuckDuckGo search  |
-| `max_results` | int  | 5       | Maximum number of results |
+### OpenAI-Compatible Search
 
-### Perplexity
+This backend is for providers that expose search through an OpenAI-compatible `POST /chat/completions` endpoint, such as:
 
-| Config        | Type   | Default | Description               |
-| ------------- | ------ | ------- | ------------------------- |
-| `enabled`     | bool   | false   | Enable Perplexity search  |
-| `api_key`     | string | -       | Perplexity API key        |
-| `max_results` | int    | 5       | Maximum number of results |
+```bash
+curl --location --request POST 'http://jeniya.cn/v1/chat/completions'
+```
+
+| Config             | Type   | Default | Description |
+| ------------------ | ------ | ------- | ----------- |
+| `enabled`          | bool   | false   | Enable OpenAI-compatible search backend |
+| `api_key`          | string | -       | Bearer token for the endpoint |
+| `base_url`         | string | -       | Full `chat/completions` URL, or an API base URL ending in `/v1` |
+| `model`            | string | -       | Search model name, for example `grok-4-fast` |
+
+PicoClaw currently sends fixed defaults for this backend:
+
+- `max_tokens: 8192`
+- `temperature: 1.0`
+- timeout: `30s`
+- built-in system prompt
+
+Example:
+
+```json
+{
+  "tools": {
+    "web": {
+      "search_provider": "openai",
+      "openai_search": {
+        "enabled": true,
+        "api_key": "xxxx",
+        "base_url": "http://jeniya.cn/v1/chat/completions",
+        "model": "grok-4-fast"
+      }
+    }
+  }
+}
+```
+
+`web_search` uses only the configured `openai_search` backend. `web_fetch` now always performs a direct HTTP fetch plus local extraction.
 
 ## Exec Tool
 
@@ -212,7 +239,8 @@ All configuration options can be overridden via environment variables with the f
 
 For example:
 
-- `PICOCLAW_TOOLS_WEB_BRAVE_ENABLED=true`
+- `PICOCLAW_TOOLS_WEB_SEARCH_PROVIDER=openai`
+- `PICOCLAW_TOOLS_WEB_OPENAI_SEARCH_ENABLED=true`
 - `PICOCLAW_TOOLS_EXEC_ENABLE_DENY_PATTERNS=false`
 - `PICOCLAW_TOOLS_CRON_EXEC_TIMEOUT_MINUTES=10`
 - `PICOCLAW_TOOLS_MCP_ENABLED=true`

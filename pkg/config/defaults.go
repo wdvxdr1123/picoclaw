@@ -112,6 +112,10 @@ func DefaultConfig() *Config {
 				Type:    "qwen",
 				APIBase: "https://dashscope.aliyuncs.com/compatible-mode/v1",
 			},
+			Kimi: ProviderConfig{
+				Type:    "kimi",
+				APIBase: "https://api.moonshot.ai/v1",
+			},
 			Moonshot: ProviderConfig{
 				Type:    "moonshot",
 				APIBase: "https://api.moonshot.cn/v1",
@@ -193,6 +197,9 @@ func DefaultConfig() *Config {
 			// Qwen - https://dashscope.console.aliyun.com/apiKey
 			"qwen-plus": {{Provider: "qwen", Model: "qwen-plus"}},
 
+			// Kimi - https://platform.moonshot.ai/console/api-keys
+			"kimi-k2.5-official": {{Provider: "kimi", Model: "kimi-k2.5"}},
+
 			// Moonshot - https://platform.moonshot.cn/console/api-keys
 			"moonshot-v1-8k": {{Provider: "moonshot", Model: "moonshot-v1-8k"}},
 
@@ -253,33 +260,13 @@ func DefaultConfig() *Config {
 				ToolConfig: ToolConfig{
 					Enabled: true,
 				},
+				SearchProvider:  "auto",
 				Proxy:           "",
 				FetchLimitBytes: 10 * 1024 * 1024, // 10MB by default
-				Brave: BraveConfig{
-					Enabled:    false,
-					APIKey:     "",
-					MaxResults: 5,
-				},
-				DuckDuckGo: DuckDuckGoConfig{
-					Enabled:    true,
-					MaxResults: 5,
-				},
-				Perplexity: PerplexityConfig{
-					Enabled:    false,
-					APIKey:     "",
-					MaxResults: 5,
-				},
-				SearXNG: SearXNGConfig{
-					Enabled:    false,
-					BaseURL:    "",
-					MaxResults: 5,
-				},
-				GLMSearch: GLMSearchConfig{
-					Enabled:      false,
-					APIKey:       "",
-					BaseURL:      "https://open.bigmodel.cn/api/paas/v4/web_search",
-					SearchEngine: "search_std",
-					MaxResults:   5,
+				OpenAISearch: OpenAISearchConfig{
+					Enabled: false,
+					BaseURL: "",
+					Model:   "",
 				},
 			},
 			Cron: CronToolsConfig{

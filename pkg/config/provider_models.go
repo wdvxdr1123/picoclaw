@@ -66,6 +66,7 @@ func (p *ProvidersConfig) SyncNamed() {
 	syncBuiltIn("gemini", p.Gemini)
 	syncBuiltIn("nvidia", p.Nvidia)
 	syncBuiltIn("ollama", p.Ollama)
+	syncBuiltIn("kimi", p.Kimi)
 	syncBuiltIn("moonshot", p.Moonshot)
 	syncBuiltIn("shengsuanyun", p.ShengSuanYun)
 	syncBuiltIn("deepseek", p.DeepSeek)
@@ -129,6 +130,9 @@ func (c *Config) ResolveModelListFromModels() ([]ModelConfig, error) {
 
 			providerName := NormalizeProviderName(variant.Provider)
 			providerCfg := c.Providers.Get(providerName)
+			if providerName == "kimi" && providerCfg.IsZero() && providerCfg.Type == "" {
+				providerCfg = c.Providers.Get("moonshot")
+			}
 			if providerCfg.IsZero() && providerCfg.Type == "" {
 				return nil, fmt.Errorf("models.%s[%d]: provider %q not found", name, idx, variant.Provider)
 			}
@@ -136,6 +140,8 @@ func (c *Config) ResolveModelListFromModels() ([]ModelConfig, error) {
 			providerType := providerCfg.Type
 			if providerType == "" {
 				providerType = NormalizeProviderType(providerName)
+			} else if providerName == "kimi" {
+				providerType = "kimi"
 			}
 
 			result = append(result, ModelConfig{

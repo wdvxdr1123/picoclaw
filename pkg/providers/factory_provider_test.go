@@ -119,6 +119,26 @@ func TestCreateProviderFromConfig_LiteLLM(t *testing.T) {
 	}
 }
 
+func TestCreateProviderFromConfig_Kimi(t *testing.T) {
+	cfg := &config.ModelConfig{
+		ModelName: "test-kimi",
+		Model:     "kimi/kimi-k2.5",
+		APIKey:    "test-key",
+		APIBase:   "https://api.moonshot.ai/v1",
+	}
+
+	provider, modelID, err := CreateProviderFromConfig(cfg)
+	if err != nil {
+		t.Fatalf("CreateProviderFromConfig() error = %v", err)
+	}
+	if _, ok := provider.(*HTTPProvider); !ok {
+		t.Fatalf("expected *HTTPProvider, got %T", provider)
+	}
+	if modelID != "kimi-k2.5" {
+		t.Fatalf("modelID = %q, want %q", modelID, "kimi-k2.5")
+	}
+}
+
 func TestCreateProviderFromConfig_Anthropic(t *testing.T) {
 	cfg := &config.ModelConfig{
 		ModelName: "test-anthropic",
@@ -166,6 +186,7 @@ func TestResolveWireFormat(t *testing.T) {
 		{protocol: "anthropic", want: WireFormatAnthropic},
 		{protocol: "claude", want: WireFormatAnthropic},
 		{protocol: "openai", want: WireFormatOpenAI},
+		{protocol: "kimi", want: WireFormatOpenAI},
 		{protocol: "deepseek", want: WireFormatOpenAI},
 		{protocol: "unknown", want: WireFormatOpenAI},
 	}

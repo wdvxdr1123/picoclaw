@@ -709,35 +709,9 @@ type ToolsConfig struct {
 }
 
 type WebToolsConfig struct {
-	Brave      BraveConfig      `json:"brave"`
-	Tavily     TavilyConfig     `json:"tavily"`
-	DuckDuckGo DuckDuckGoConfig `json:"duckduckgo"`
-	Perplexity PerplexityConfig `json:"perplexity"`
-	Proxy      string           `json:"proxy,omitempty"`
-}
-
-type BraveConfig struct {
-	Enabled    bool   `json:"enabled"`
-	APIKey     string `json:"api_key"`
-	MaxResults int    `json:"max_results"`
-}
-
-type TavilyConfig struct {
-	Enabled    bool   `json:"enabled"`
-	APIKey     string `json:"api_key"`
-	BaseURL    string `json:"base_url"`
-	MaxResults int    `json:"max_results"`
-}
-
-type DuckDuckGoConfig struct {
-	Enabled    bool `json:"enabled"`
-	MaxResults int  `json:"max_results"`
-}
-
-type PerplexityConfig struct {
-	Enabled    bool   `json:"enabled"`
-	APIKey     string `json:"api_key"`
-	MaxResults int    `json:"max_results"`
+	SearchProvider string                    `json:"search_provider,omitempty"`
+	OpenAISearch   config.OpenAISearchConfig `json:"openai_search"`
+	Proxy          string                    `json:"proxy,omitempty"`
 }
 
 type CronConfig struct {
@@ -1004,27 +978,9 @@ func (c GatewayConfig) ToStandardGateway() config.GatewayConfig {
 func (c ToolsConfig) ToStandardTools() config.ToolsConfig {
 	return config.ToolsConfig{
 		Web: config.WebToolsConfig{
-			Brave: config.BraveConfig{
-				Enabled:    c.Web.Brave.Enabled,
-				APIKey:     c.Web.Brave.APIKey,
-				MaxResults: c.Web.Brave.MaxResults,
-			},
-			Tavily: config.TavilyConfig{
-				Enabled:    c.Web.Tavily.Enabled,
-				APIKey:     c.Web.Tavily.APIKey,
-				BaseURL:    c.Web.Tavily.BaseURL,
-				MaxResults: c.Web.Tavily.MaxResults,
-			},
-			DuckDuckGo: config.DuckDuckGoConfig{
-				Enabled:    c.Web.DuckDuckGo.Enabled,
-				MaxResults: c.Web.DuckDuckGo.MaxResults,
-			},
-			Perplexity: config.PerplexityConfig{
-				Enabled:    c.Web.Perplexity.Enabled,
-				APIKey:     c.Web.Perplexity.APIKey,
-				MaxResults: c.Web.Perplexity.MaxResults,
-			},
-			Proxy: c.Web.Proxy,
+			SearchProvider: c.Web.SearchProvider,
+			OpenAISearch:   c.Web.OpenAISearch,
+			Proxy:          c.Web.Proxy,
 		},
 		Cron: config.CronToolsConfig{
 			ExecTimeoutMinutes: c.Cron.ExecTimeoutMinutes,

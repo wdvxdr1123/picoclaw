@@ -398,7 +398,7 @@ func TestConvertProvidersToModelList_ProviderNameAliases(t *testing.T) {
 		{"claude", "anthropic/claude-custom", ProviderConfig{APIKey: "key"}},
 		{"doubao", "volcengine/doubao-custom", ProviderConfig{APIKey: "key"}},
 		{"tongyi", "qwen/qwen-custom", ProviderConfig{APIKey: "key"}},
-		{"kimi", "moonshot/kimi-custom", ProviderConfig{APIKey: "key"}},
+		{"kimi", "kimi/kimi-custom", ProviderConfig{APIKey: "key"}},
 	}
 
 	for _, tt := range tests {
@@ -427,7 +427,7 @@ func TestConvertProvidersToModelList_ProviderNameAliases(t *testing.T) {
 			case "tongyi":
 				cfg.Providers.Qwen = tt.provider
 			case "kimi":
-				cfg.Providers.Moonshot = tt.provider
+				cfg.Providers.Kimi = tt.provider
 			}
 
 			// Need to fix the model name in config

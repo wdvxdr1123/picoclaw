@@ -225,7 +225,28 @@ func ConvertProvidersToModelList(cfg *Config) []ModelConfig {
 			},
 		},
 		{
-			providerNames: []string{"moonshot", "kimi"},
+			providerNames: []string{"kimi"},
+			protocol:      "kimi",
+			buildConfig: func(p ProvidersConfig) (ModelConfig, bool) {
+				providerCfg := p.Kimi
+				if providerCfg.APIKey == "" && providerCfg.APIBase == "" {
+					providerCfg = p.Moonshot
+				}
+				if providerCfg.APIKey == "" && providerCfg.APIBase == "" {
+					return ModelConfig{}, false
+				}
+				return ModelConfig{
+					ModelName:      "kimi",
+					Model:          "kimi/kimi",
+					APIKey:         providerCfg.APIKey,
+					APIBase:        providerCfg.APIBase,
+					Proxy:          providerCfg.Proxy,
+					RequestTimeout: providerCfg.RequestTimeout,
+				}, true
+			},
+		},
+		{
+			providerNames: []string{"moonshot"},
 			protocol:      "moonshot",
 			buildConfig: func(p ProvidersConfig) (ModelConfig, bool) {
 				if p.Moonshot.APIKey == "" && p.Moonshot.APIBase == "" {

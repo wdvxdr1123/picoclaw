@@ -13,6 +13,8 @@ import (
 	anthropicprovider "github.com/sipeed/picoclaw/pkg/providers/anthropic"
 )
 
+const defaultKimiUserAgent = "KimiCLI/1.18.0"
+
 // createClaudeAuthProvider creates a Claude provider using OAuth credentials from auth store.
 func createClaudeAuthProvider() (LLMProvider, error) {
 	cred, err := getCredential("anthropic")
@@ -106,12 +108,17 @@ func CreateProviderFromConfig(cfg *config.ModelConfig) (LLMProvider, string, err
 		if apiBase == "" {
 			return nil, "", fmt.Errorf("api_base is required for custom openai-compatible protocol %q", protocol)
 		}
-		return NewHTTPProviderWithMaxTokensFieldAndRequestTimeout(
+		userAgent := ""
+		if strings.EqualFold(protocol, "kimi") {
+			userAgent = defaultKimiUserAgent
+		}
+		return NewHTTPProviderWithOptions(
 			cfg.APIKey,
 			apiBase,
 			cfg.Proxy,
 			cfg.MaxTokensField,
 			cfg.RequestTimeout,
+			userAgent,
 		), modelID, nil
 	}
 

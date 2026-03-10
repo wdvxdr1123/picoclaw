@@ -179,6 +179,61 @@ func TestToolContext_Updates(t *testing.T) {
 	}
 }
 
+func TestResolveAgentWebProviderConfig_KimiProviderUsesModelAPIKey(t *testing.T) {
+	cfg := &config.Config{
+		Providers: config.ProvidersConfig{
+			Kimi: config.ProviderConfig{
+				Type:    "kimi",
+				APIKey:  "kimi-provider-key",
+				APIBase: "https://api.moonshot.ai/v1",
+			},
+		},
+		Models: config.ModelsConfig{
+			"kimi-model": {{Provider: "kimi", Model: "kimi-k2.5"}},
+		},
+	}
+	var err error
+	cfg.ModelList, err = cfg.ResolveModelListFromModels()
+	if err != nil {
+		t.Fatalf("ResolveModelListFromModels() error = %v", err)
+	}
+
+	agent := NewAgentInstance(nil, &config.AgentDefaults{Workspace: t.TempDir(), Model: "kimi-model"}, cfg, &mockProvider{})
+	got := resolveAgentWebProviderConfig(cfg, agent)
+	if got.ProviderType != "kimi" {
+		t.Fatalf("ProviderType = %q, want %q", got.ProviderType, "kimi")
+	}
+	if got.APIKey != "kimi-provider-key" {
+		t.Fatalf("APIKey = %q, want %q", got.APIKey, "kimi-provider-key")
+	}
+}
+
+func TestResolveAgentWebProviderConfig_NonKimiProviderDoesNotEnableKimiWeb(t *testing.T) {
+	cfg := &config.Config{
+		Providers: config.ProvidersConfig{
+			OpenAI: config.ProviderConfig{
+				Type:    "openai",
+				APIKey:  "openai-key",
+				APIBase: "https://api.openai.com/v1",
+			},
+		},
+		Models: config.ModelsConfig{
+			"gpt-model": {{Provider: "openai", Model: "gpt-5.2"}},
+		},
+	}
+	var err error
+	cfg.ModelList, err = cfg.ResolveModelListFromModels()
+	if err != nil {
+		t.Fatalf("ResolveModelListFromModels() error = %v", err)
+	}
+
+	agent := NewAgentInstance(nil, &config.AgentDefaults{Workspace: t.TempDir(), Model: "gpt-model"}, cfg, &mockProvider{})
+	got := resolveAgentWebProviderConfig(cfg, agent)
+	if got.ProviderType != "openai" {
+		t.Fatalf("ProviderType = %q, want %q", got.ProviderType, "openai")
+	}
+}
+
 // TestToolRegistry_GetDefinitions verifies tool definitions can be retrieved
 func TestToolRegistry_GetDefinitions(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "agent-test-*")

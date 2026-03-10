@@ -120,30 +120,24 @@ func registerSharedTools(
 			continue
 		}
 
+		webProviderCfg := resolveAgentWebProviderConfig(cfg, agent)
 		// Web tools
 		if cfg.Tools.IsToolEnabled("web") {
 			searchTool, err := tools.NewWebSearchTool(tools.WebSearchToolOptions{
-				BraveAPIKey:          cfg.Tools.Web.Brave.APIKey,
-				BraveMaxResults:      cfg.Tools.Web.Brave.MaxResults,
-				BraveEnabled:         cfg.Tools.Web.Brave.Enabled,
-				TavilyAPIKey:         cfg.Tools.Web.Tavily.APIKey,
-				TavilyBaseURL:        cfg.Tools.Web.Tavily.BaseURL,
-				TavilyMaxResults:     cfg.Tools.Web.Tavily.MaxResults,
-				TavilyEnabled:        cfg.Tools.Web.Tavily.Enabled,
-				DuckDuckGoMaxResults: cfg.Tools.Web.DuckDuckGo.MaxResults,
-				DuckDuckGoEnabled:    cfg.Tools.Web.DuckDuckGo.Enabled,
-				PerplexityAPIKey:     cfg.Tools.Web.Perplexity.APIKey,
-				PerplexityMaxResults: cfg.Tools.Web.Perplexity.MaxResults,
-				PerplexityEnabled:    cfg.Tools.Web.Perplexity.Enabled,
-				SearXNGBaseURL:       cfg.Tools.Web.SearXNG.BaseURL,
-				SearXNGMaxResults:    cfg.Tools.Web.SearXNG.MaxResults,
-				SearXNGEnabled:       cfg.Tools.Web.SearXNG.Enabled,
-				GLMSearchAPIKey:      cfg.Tools.Web.GLMSearch.APIKey,
-				GLMSearchBaseURL:     cfg.Tools.Web.GLMSearch.BaseURL,
-				GLMSearchEngine:      cfg.Tools.Web.GLMSearch.SearchEngine,
-				GLMSearchMaxResults:  cfg.Tools.Web.GLMSearch.MaxResults,
-				GLMSearchEnabled:     cfg.Tools.Web.GLMSearch.Enabled,
-				Proxy:                cfg.Tools.Web.Proxy,
+				SearchProvider:      cfg.Tools.Web.SearchProvider,
+				OpenAISearchEnabled: cfg.Tools.Web.OpenAISearch.Enabled,
+				OpenAISearchAPIKey: coalesceString(
+					cfg.Tools.Web.OpenAISearch.APIKey,
+					matchingProviderValue(webProviderCfg, "openai", webProviderCfg.APIKey),
+				),
+				OpenAISearchBaseURL: coalesceString(
+					cfg.Tools.Web.OpenAISearch.BaseURL,
+					matchingProviderValue(webProviderCfg, "openai", normalizeOpenAIChatCompletionsURL(webProviderCfg.APIBase)),
+				),
+				OpenAISearchModel: coalesceString(
+					cfg.Tools.Web.OpenAISearch.Model,
+					matchingProviderValue(webProviderCfg, "openai", webProviderCfg.ModelID),
+				),
 			})
 			if err != nil {
 				logger.ErrorCF("agent", "Failed to create web search tool", map[string]any{"error": err.Error()})
@@ -227,6 +221,86 @@ func registerSharedTools(
 			}
 		}
 	}
+}
+
+type agentWebProviderConfig struct {
+	ProviderName string
+	ProviderType string
+	APIKey       string
+	APIBase      string
+	ModelID      string
+}
+
+func resolveAgentWebProviderConfig(cfg *config.Config, agent *AgentInstance) agentWebProviderConfig {
+	if agent == nil {
+		return agentWebProviderConfig{}
+	}
+
+	modelCfg := agent.ResolvedModelConfig
+	if modelCfg == nil && cfg != nil {
+		if resolved, err := cfg.GetModelConfig(agent.Model); err == nil {
+			modelCfg = resolved
+		}
+	}
+	if modelCfg == nil {
+		return agentWebProviderConfig{}
+	}
+
+	providerName := strings.ToLower(strings.TrimSpace(modelCfg.Provider))
+	providerType := ""
+	apiKey := modelCfg.APIKey
+	apiBase := modelCfg.APIBase
+	if cfg != nil && providerName != "" {
+		providerCfg := cfg.Providers.Get(providerName)
+		if strings.TrimSpace(providerCfg.Type) != "" {
+			providerType = config.NormalizeProviderType(providerCfg.Type)
+		}
+		if strings.TrimSpace(providerCfg.APIKey) != "" {
+			apiKey = providerCfg.APIKey
+		}
+		if strings.TrimSpace(providerCfg.APIBase) != "" {
+			apiBase = providerCfg.APIBase
+		}
+	}
+	protocol, modelID := providers.ExtractProtocol(modelCfg.Model)
+	if providerType == "" {
+		providerType = config.NormalizeProviderType(protocol)
+	}
+	return agentWebProviderConfig{
+		ProviderName: config.NormalizeProviderName(providerName),
+		ProviderType: strings.ToLower(strings.TrimSpace(providerType)),
+		APIKey:       strings.TrimSpace(apiKey),
+		APIBase:      strings.TrimSpace(apiBase),
+		ModelID:      strings.TrimSpace(modelID),
+	}
+}
+
+func coalesceString(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func matchingProviderValue(cfg agentWebProviderConfig, wantType, value string) string {
+	if strings.EqualFold(strings.TrimSpace(cfg.ProviderType), strings.TrimSpace(wantType)) {
+		return value
+	}
+	return ""
+}
+
+func normalizeOpenAIChatCompletionsURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	raw = strings.TrimRight(raw, "/")
+	if strings.HasSuffix(raw, "/chat/completions") {
+		return raw
+	}
+	return raw + "/chat/completions"
 }
 
 func (al *AgentLoop) Run(ctx context.Context) error {

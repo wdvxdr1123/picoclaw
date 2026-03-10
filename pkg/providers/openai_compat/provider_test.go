@@ -366,44 +366,50 @@ func TestProviderChat_LargeHTMLResponsePreviewIsTruncated(t *testing.T) {
 	}
 }
 
-func TestProviderChat_StripsMoonshotPrefixAndNormalizesKimiTemperature(t *testing.T) {
-	var requestBody map[string]any
+func TestProviderChat_StripsKimiCompatiblePrefixAndNormalizesKimiTemperature(t *testing.T) {
+	tests := []string{"moonshot/kimi-k2.5", "kimi/kimi-k2.5"}
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		resp := map[string]any{
-			"choices": []map[string]any{
-				{
-					"message":       map[string]any{"content": "ok"},
-					"finish_reason": "stop",
-				},
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
-	}))
-	defer server.Close()
+	for _, model := range tests {
+		t.Run(model, func(t *testing.T) {
+			var requestBody map[string]any
 
-	p := NewProvider("key", server.URL, "")
-	_, err := p.Chat(
-		t.Context(),
-		[]Message{{Role: "user", Content: "hi"}},
-		nil,
-		"moonshot/kimi-k2.5",
-		map[string]any{"temperature": 0.3},
-	)
-	if err != nil {
-		t.Fatalf("Chat() error = %v", err)
-	}
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+					http.Error(w, err.Error(), http.StatusBadRequest)
+					return
+				}
+				resp := map[string]any{
+					"choices": []map[string]any{
+						{
+							"message":       map[string]any{"content": "ok"},
+							"finish_reason": "stop",
+						},
+					},
+				}
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(resp)
+			}))
+			defer server.Close()
 
-	if requestBody["model"] != "kimi-k2.5" {
-		t.Fatalf("model = %v, want kimi-k2.5", requestBody["model"])
-	}
-	if requestBody["temperature"] != 1.0 {
-		t.Fatalf("temperature = %v, want 1.0", requestBody["temperature"])
+			p := NewProvider("key", server.URL, "")
+			_, err := p.Chat(
+				t.Context(),
+				[]Message{{Role: "user", Content: "hi"}},
+				nil,
+				model,
+				map[string]any{"temperature": 0.3},
+			)
+			if err != nil {
+				t.Fatalf("Chat() error = %v", err)
+			}
+
+			if requestBody["model"] != "kimi-k2.5" {
+				t.Fatalf("model = %v, want kimi-k2.5", requestBody["model"])
+			}
+			if requestBody["temperature"] != 1.0 {
+				t.Fatalf("temperature = %v, want 1.0", requestBody["temperature"])
+			}
+		})
 	}
 }
 

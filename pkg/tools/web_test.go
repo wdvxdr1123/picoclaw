@@ -16,7 +16,6 @@ import (
 
 const testFetchLimit = int64(10 * 1024 * 1024)
 
-// TestWebTool_WebFetch_Success verifies successful URL fetching
 func TestWebTool_WebFetch_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
@@ -30,30 +29,18 @@ func TestWebTool_WebFetch_Success(t *testing.T) {
 		t.Fatalf("Failed to create web fetch tool: %v", err)
 	}
 
-	ctx := context.Background()
-	args := map[string]any{
-		"url": server.URL,
-	}
-
-	result := tool.Execute(ctx, args)
-
-	// Success should not be an error
+	result := tool.Execute(context.Background(), map[string]any{"url": server.URL})
 	if result.IsError {
 		t.Errorf("Expected success, got IsError=true: %s", result.ForLLM)
 	}
-
-	// ForLLM should contain the fetched content (full JSON result)
 	if !strings.Contains(result.ForLLM, "Test Page") {
 		t.Errorf("Expected ForLLM to contain 'Test Page', got: %s", result.ForLLM)
 	}
-
-	// ForUser should contain summary
 	if !strings.Contains(result.ForUser, "bytes") && !strings.Contains(result.ForUser, "extractor") {
 		t.Errorf("Expected ForUser to contain summary, got: %s", result.ForUser)
 	}
 }
 
-// TestWebTool_WebFetch_JSON verifies JSON content handling
 func TestWebTool_WebFetch_JSON(t *testing.T) {
 	testData := map[string]string{"key": "value", "number": "123"}
 	expectedJSON, _ := json.MarshalIndent(testData, "", "  ")
@@ -70,101 +57,62 @@ func TestWebTool_WebFetch_JSON(t *testing.T) {
 		logger.ErrorCF("agent", "Failed to create web fetch tool", map[string]any{"error": err.Error()})
 	}
 
-	ctx := context.Background()
-	args := map[string]any{
-		"url": server.URL,
-	}
-
-	result := tool.Execute(ctx, args)
-
-	// Success should not be an error
+	result := tool.Execute(context.Background(), map[string]any{"url": server.URL})
 	if result.IsError {
 		t.Errorf("Expected success, got IsError=true: %s", result.ForLLM)
 	}
-
-	// ForLLM should contain formatted JSON
 	if !strings.Contains(result.ForLLM, "key") && !strings.Contains(result.ForLLM, "value") {
 		t.Errorf("Expected ForLLM to contain JSON data, got: %s", result.ForLLM)
 	}
 }
 
-// TestWebTool_WebFetch_InvalidURL verifies error handling for invalid URL
 func TestWebTool_WebFetch_InvalidURL(t *testing.T) {
 	tool, err := NewWebFetchTool(50000, testFetchLimit)
 	if err != nil {
 		logger.ErrorCF("agent", "Failed to create web fetch tool", map[string]any{"error": err.Error()})
 	}
 
-	ctx := context.Background()
-	args := map[string]any{
-		"url": "not-a-valid-url",
-	}
-
-	result := tool.Execute(ctx, args)
-
-	// Should return error result
+	result := tool.Execute(context.Background(), map[string]any{"url": "not-a-valid-url"})
 	if !result.IsError {
 		t.Errorf("Expected error for invalid URL")
 	}
-
-	// Should contain error message (either "invalid URL" or scheme error)
 	if !strings.Contains(result.ForLLM, "URL") && !strings.Contains(result.ForUser, "URL") {
 		t.Errorf("Expected error message for invalid URL, got ForLLM: %s", result.ForLLM)
 	}
 }
 
-// TestWebTool_WebFetch_UnsupportedScheme verifies error handling for non-http URLs
 func TestWebTool_WebFetch_UnsupportedScheme(t *testing.T) {
 	tool, err := NewWebFetchTool(50000, testFetchLimit)
 	if err != nil {
 		logger.ErrorCF("agent", "Failed to create web fetch tool", map[string]any{"error": err.Error()})
 	}
 
-	ctx := context.Background()
-	args := map[string]any{
-		"url": "ftp://example.com/file.txt",
-	}
-
-	result := tool.Execute(ctx, args)
-
-	// Should return error result
+	result := tool.Execute(context.Background(), map[string]any{"url": "ftp://example.com/file.txt"})
 	if !result.IsError {
 		t.Errorf("Expected error for unsupported URL scheme")
 	}
-
-	// Should mention only http/https allowed
 	if !strings.Contains(result.ForLLM, "http/https") && !strings.Contains(result.ForUser, "http/https") {
 		t.Errorf("Expected scheme error message, got ForLLM: %s", result.ForLLM)
 	}
 }
 
-// TestWebTool_WebFetch_MissingURL verifies error handling for missing URL
 func TestWebTool_WebFetch_MissingURL(t *testing.T) {
 	tool, err := NewWebFetchTool(50000, testFetchLimit)
 	if err != nil {
 		logger.ErrorCF("agent", "Failed to create web fetch tool", map[string]any{"error": err.Error()})
 	}
 
-	ctx := context.Background()
-	args := map[string]any{}
-
-	result := tool.Execute(ctx, args)
-
-	// Should return error result
+	result := tool.Execute(context.Background(), map[string]any{})
 	if !result.IsError {
 		t.Errorf("Expected error when URL is missing")
 	}
-
-	// Should mention URL is required
 	if !strings.Contains(result.ForLLM, "url is required") && !strings.Contains(result.ForUser, "url is required") {
 		t.Errorf("Expected 'url is required' message, got ForLLM: %s", result.ForLLM)
 	}
 }
 
-// TestWebTool_WebFetch_Truncation verifies content truncation
 func TestWebTool_WebFetch_Truncation(t *testing.T) {
 	longContent := strings.Repeat("x", 20000)
-
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
@@ -172,127 +120,91 @@ func TestWebTool_WebFetch_Truncation(t *testing.T) {
 	}))
 	defer server.Close()
 
-	tool, err := NewWebFetchTool(1000, testFetchLimit) // Limit to 1000 chars
+	tool, err := NewWebFetchTool(1000, testFetchLimit)
 	if err != nil {
 		logger.ErrorCF("agent", "Failed to create web fetch tool", map[string]any{"error": err.Error()})
 	}
 
-	ctx := context.Background()
-	args := map[string]any{
-		"url": server.URL,
-	}
-
-	result := tool.Execute(ctx, args)
-
-	// Success should not be an error
+	result := tool.Execute(context.Background(), map[string]any{"url": server.URL})
 	if result.IsError {
 		t.Errorf("Expected success, got IsError=true: %s", result.ForLLM)
 	}
 
-	// ForLLM should contain truncated content (not the full 20000 chars)
 	resultMap := make(map[string]any)
 	json.Unmarshal([]byte(result.ForLLM), &resultMap)
-	if text, ok := resultMap["text"].(string); ok {
-		if len(text) > 1100 { // Allow some margin
-			t.Errorf("Expected content to be truncated to ~1000 chars, got: %d", len(text))
-		}
+	if text, ok := resultMap["text"].(string); ok && len(text) > 1100 {
+		t.Errorf("Expected content to be truncated to ~1000 chars, got: %d", len(text))
 	}
-
-	// Should be marked as truncated
 	if truncated, ok := resultMap["truncated"].(bool); !ok || !truncated {
 		t.Errorf("Expected 'truncated' to be true in result")
 	}
 }
 
 func TestWebFetchTool_PayloadTooLarge(t *testing.T) {
-	// Create a mock HTTP server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusOK)
-
-		// Generate a payload intentionally larger than our limit.
-		// Limit: 10 * 1024 * 1024 (10MB). We generate 10MB + 100 bytes of the letter 'A'.
-		largeData := bytes.Repeat([]byte("A"), int(testFetchLimit)+100)
-
-		w.Write(largeData)
+		w.Write(bytes.Repeat([]byte("A"), int(testFetchLimit)+100))
 	}))
-	// Ensure the server is shut down at the end of the test
 	defer ts.Close()
 
-	// Initialize the tool
 	tool, err := NewWebFetchTool(50000, testFetchLimit)
 	if err != nil {
 		logger.ErrorCF("agent", "Failed to create web fetch tool", map[string]any{"error": err.Error()})
 	}
 
-	// Prepare the arguments pointing to the URL of our local mock server
-	args := map[string]any{
-		"url": ts.URL,
-	}
-
-	// Execute the tool
-	ctx := context.Background()
-	result := tool.Execute(ctx, args)
-
-	// Assuming ErrorResult sets the ForLLM field with the error text.
+	result := tool.Execute(context.Background(), map[string]any{"url": ts.URL})
 	if result == nil {
 		t.Fatal("expected a ToolResult, got nil")
 	}
 
-	// Search for the exact error string we set earlier in the Execute method
 	expectedErrorMsg := fmt.Sprintf("size exceeded %d bytes limit", testFetchLimit)
-
 	if !strings.Contains(result.ForLLM, expectedErrorMsg) && !strings.Contains(result.ForUser, expectedErrorMsg) {
 		t.Errorf("test failed: expected error %q, but got: %+v", expectedErrorMsg, result)
 	}
 }
 
-// TestWebTool_WebSearch_NoApiKey verifies that no tool is created when API key is missing
 func TestWebTool_WebSearch_NoApiKey(t *testing.T) {
-	tool, err := NewWebSearchTool(WebSearchToolOptions{BraveEnabled: true, BraveAPIKey: ""})
+	tool, err := NewWebSearchTool(WebSearchToolOptions{OpenAISearchEnabled: true, OpenAISearchAPIKey: ""})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	if tool != nil {
-		t.Errorf("Expected nil tool when Brave API key is empty")
+		t.Errorf("Expected nil tool when OpenAI search API key is empty")
 	}
 
-	// Also nil when nothing is enabled
 	tool, err = NewWebSearchTool(WebSearchToolOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	if tool != nil {
-		t.Errorf("Expected nil tool when no provider is enabled")
+		t.Errorf("Expected nil tool when web search is disabled")
 	}
 }
 
-// TestWebTool_WebSearch_MissingQuery verifies error handling for missing query
 func TestWebTool_WebSearch_MissingQuery(t *testing.T) {
-	tool, err := NewWebSearchTool(WebSearchToolOptions{BraveEnabled: true, BraveAPIKey: "test-key", BraveMaxResults: 5})
+	tool, err := NewWebSearchTool(WebSearchToolOptions{
+		OpenAISearchEnabled: true,
+		OpenAISearchAPIKey:  "test-key",
+		OpenAISearchBaseURL: "https://example.com/v1/chat/completions",
+		OpenAISearchModel:   "grok-4-fast",
+	})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	ctx := context.Background()
-	args := map[string]any{}
 
-	result := tool.Execute(ctx, args)
-
-	// Should return error result
+	result := tool.Execute(context.Background(), map[string]any{})
 	if !result.IsError {
 		t.Errorf("Expected error when query is missing")
 	}
 }
 
-// TestWebTool_WebFetch_HTMLExtraction verifies HTML text extraction
 func TestWebTool_WebFetch_HTMLExtraction(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusOK)
 		w.Write(
-			[]byte(
-				`<html><body><script>alert('test');</script><style>body{color:red;}</style><h1>Title</h1><p>Content</p></body></html>`,
-			),
+			[]byte(`<html><body><script>alert('test');</script><style>body{color:red;}</style><h1>Title</h1><p>Content</p></body></html>`),
 		)
 	}))
 	defer server.Close()
@@ -302,33 +214,20 @@ func TestWebTool_WebFetch_HTMLExtraction(t *testing.T) {
 		logger.ErrorCF("agent", "Failed to create web fetch tool", map[string]any{"error": err.Error()})
 	}
 
-	ctx := context.Background()
-	args := map[string]any{
-		"url": server.URL,
-	}
-
-	result := tool.Execute(ctx, args)
-
-	// Success should not be an error
+	result := tool.Execute(context.Background(), map[string]any{"url": server.URL})
 	if result.IsError {
 		t.Errorf("Expected success, got IsError=true: %s", result.ForLLM)
 	}
-
-	// ForLLM should contain extracted text (without script/style tags)
 	if !strings.Contains(result.ForLLM, "Title") && !strings.Contains(result.ForLLM, "Content") {
 		t.Errorf("Expected ForLLM to contain extracted text, got: %s", result.ForLLM)
 	}
-
-	// Should NOT contain script or style tags in ForLLM
 	if strings.Contains(result.ForLLM, "<script>") || strings.Contains(result.ForLLM, "<style>") {
 		t.Errorf("Expected script/style tags to be removed, got: %s", result.ForLLM)
 	}
 }
 
-// TestWebFetchTool_extractText verifies text extraction preserves newlines
 func TestWebFetchTool_extractText(t *testing.T) {
 	tool := &WebFetchTool{}
-
 	tests := []struct {
 		name     string
 		input    string
@@ -342,8 +241,7 @@ func TestWebFetchTool_extractText(t *testing.T) {
 				if len(lines) < 2 {
 					t.Errorf("Expected multiple lines, got %d: %q", len(lines), got)
 				}
-				if !strings.Contains(got, "Title") || !strings.Contains(got, "Paragraph 1") ||
-					!strings.Contains(got, "Paragraph 2") {
+				if !strings.Contains(got, "Title") || !strings.Contains(got, "Paragraph 1") || !strings.Contains(got, "Paragraph 2") {
 					t.Errorf("Missing expected text: %q", got)
 				}
 			},
@@ -400,26 +298,16 @@ func TestWebFetchTool_extractText(t *testing.T) {
 	}
 }
 
-// TestWebTool_WebFetch_MissingDomain verifies error handling for URL without domain
 func TestWebTool_WebFetch_MissingDomain(t *testing.T) {
 	tool, err := NewWebFetchTool(50000, testFetchLimit)
 	if err != nil {
 		logger.ErrorCF("agent", "Failed to create web fetch tool", map[string]any{"error": err.Error()})
 	}
 
-	ctx := context.Background()
-	args := map[string]any{
-		"url": "https://",
-	}
-
-	result := tool.Execute(ctx, args)
-
-	// Should return error result
+	result := tool.Execute(context.Background(), map[string]any{"url": "https://"})
 	if !result.IsError {
 		t.Errorf("Expected error for URL without domain")
 	}
-
-	// Should mention missing domain
 	if !strings.Contains(result.ForLLM, "domain") && !strings.Contains(result.ForUser, "domain") {
 		t.Errorf("Expected domain error message, got ForLLM: %s", result.ForLLM)
 	}
@@ -534,7 +422,6 @@ func TestNewWebFetchToolWithProxy(t *testing.T) {
 	} else if tool.maxChars != 1024 {
 		t.Fatalf("maxChars = %d, want %d", tool.maxChars, 1024)
 	}
-
 	if tool.proxy != "http://127.0.0.1:7890" {
 		t.Fatalf("proxy = %q, want %q", tool.proxy, "http://127.0.0.1:7890")
 	}
@@ -543,273 +430,138 @@ func TestNewWebFetchToolWithProxy(t *testing.T) {
 	if err != nil {
 		logger.ErrorCF("agent", "Failed to create web fetch tool", map[string]any{"error": err.Error()})
 	}
-
 	if tool.maxChars != 50000 {
 		t.Fatalf("default maxChars = %d, want %d", tool.maxChars, 50000)
 	}
 }
 
 func TestNewWebSearchTool_PropagatesProxy(t *testing.T) {
-	t.Run("perplexity", func(t *testing.T) {
-		tool, err := NewWebSearchTool(WebSearchToolOptions{
-			PerplexityEnabled:    true,
-			PerplexityAPIKey:     "k",
-			PerplexityMaxResults: 3,
-			Proxy:                "http://127.0.0.1:7890",
-		})
-		if err != nil {
-			t.Fatalf("NewWebSearchTool() error: %v", err)
-		}
-		p, ok := tool.provider.(*PerplexitySearchProvider)
-		if !ok {
-			t.Fatalf("provider type = %T, want *PerplexitySearchProvider", tool.provider)
-		}
-		if p.proxy != "http://127.0.0.1:7890" {
-			t.Fatalf("provider proxy = %q, want %q", p.proxy, "http://127.0.0.1:7890")
-		}
-	})
-
-	t.Run("brave", func(t *testing.T) {
-		tool, err := NewWebSearchTool(WebSearchToolOptions{
-			BraveEnabled:    true,
-			BraveAPIKey:     "k",
-			BraveMaxResults: 3,
-			Proxy:           "http://127.0.0.1:7890",
-		})
-		if err != nil {
-			t.Fatalf("NewWebSearchTool() error: %v", err)
-		}
-		p, ok := tool.provider.(*BraveSearchProvider)
-		if !ok {
-			t.Fatalf("provider type = %T, want *BraveSearchProvider", tool.provider)
-		}
-		if p.proxy != "http://127.0.0.1:7890" {
-			t.Fatalf("provider proxy = %q, want %q", p.proxy, "http://127.0.0.1:7890")
-		}
-	})
-
-	t.Run("duckduckgo", func(t *testing.T) {
-		tool, err := NewWebSearchTool(WebSearchToolOptions{
-			DuckDuckGoEnabled:    true,
-			DuckDuckGoMaxResults: 3,
-			Proxy:                "http://127.0.0.1:7890",
-		})
-		if err != nil {
-			t.Fatalf("NewWebSearchTool() error: %v", err)
-		}
-		p, ok := tool.provider.(*DuckDuckGoSearchProvider)
-		if !ok {
-			t.Fatalf("provider type = %T, want *DuckDuckGoSearchProvider", tool.provider)
-		}
-		if p.proxy != "http://127.0.0.1:7890" {
-			t.Fatalf("provider proxy = %q, want %q", p.proxy, "http://127.0.0.1:7890")
-		}
-	})
-}
-
-// TestWebTool_TavilySearch_Success verifies successful Tavily search
-func TestWebTool_TavilySearch_Success(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			t.Errorf("Expected POST request, got %s", r.Method)
-		}
-		if r.Header.Get("Content-Type") != "application/json" {
-			t.Errorf("Expected Content-Type application/json, got %s", r.Header.Get("Content-Type"))
-		}
-
-		// Verify payload
-		var payload map[string]any
-		json.NewDecoder(r.Body).Decode(&payload)
-		if payload["api_key"] != "test-key" {
-			t.Errorf("Expected api_key test-key, got %v", payload["api_key"])
-		}
-		if payload["query"] != "test query" {
-			t.Errorf("Expected query 'test query', got %v", payload["query"])
-		}
-
-		// Return mock response
-		response := map[string]any{
-			"results": []map[string]any{
-				{
-					"title":   "Test Result 1",
-					"url":     "https://example.com/1",
-					"content": "Content for result 1",
-				},
-				{
-					"title":   "Test Result 2",
-					"url":     "https://example.com/2",
-					"content": "Content for result 2",
-				},
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
-	}))
-	defer server.Close()
-
 	tool, err := NewWebSearchTool(WebSearchToolOptions{
-		TavilyEnabled:    true,
-		TavilyAPIKey:     "test-key",
-		TavilyBaseURL:    server.URL,
-		TavilyMaxResults: 5,
+		SearchProvider:      "openai",
+		OpenAISearchEnabled: true,
+		OpenAISearchAPIKey:  "k",
+		OpenAISearchBaseURL: "https://example.com/v1/chat/completions",
+		OpenAISearchModel:   "grok-4-fast",
 	})
 	if err != nil {
 		t.Fatalf("NewWebSearchTool() error: %v", err)
 	}
-
-	ctx := context.Background()
-	args := map[string]any{
-		"query": "test query",
+	p, ok := tool.provider.(*OpenAISearchProvider)
+	if !ok {
+		t.Fatalf("provider type = %T, want *OpenAISearchProvider", tool.provider)
 	}
-
-	result := tool.Execute(ctx, args)
-
-	// Success should not be an error
-	if result.IsError {
-		t.Errorf("Expected success, got IsError=true: %s", result.ForLLM)
-	}
-
-	// ForUser should contain result titles and URLs
-	if !strings.Contains(result.ForUser, "Test Result 1") ||
-		!strings.Contains(result.ForUser, "https://example.com/1") {
-		t.Errorf("Expected results in output, got: %s", result.ForUser)
-	}
-
-	// Should mention via Tavily
-	if !strings.Contains(result.ForUser, "via Tavily") {
-		t.Errorf("Expected 'via Tavily' in output, got: %s", result.ForUser)
+	if p.provider == nil {
+		t.Fatal("expected OpenAI search provider to be initialized")
 	}
 }
 
-func TestWebTool_GLMSearch_Success(t *testing.T) {
+func TestNewWebSearchTool_OpenAIMissingConfigWhenForced(t *testing.T) {
+	tool, err := NewWebSearchTool(WebSearchToolOptions{
+		SearchProvider:      "openai",
+		OpenAISearchEnabled: true,
+		OpenAISearchAPIKey:  "search-key",
+	})
+	if err == nil {
+		t.Fatal("expected error when openai search is forced without full config")
+	}
+	if tool != nil {
+		t.Fatal("expected nil tool when config is incomplete")
+	}
+}
+
+func TestNewWebSearchTool_OpenAISelectedWhenConfigured(t *testing.T) {
+	tool, err := NewWebSearchTool(WebSearchToolOptions{
+		SearchProvider:      "openai",
+		OpenAISearchEnabled: true,
+		OpenAISearchAPIKey:  "search-key",
+		OpenAISearchBaseURL: "https://example.com/v1",
+		OpenAISearchModel:   "grok-4-fast",
+	})
+	if err != nil {
+		t.Fatalf("NewWebSearchTool() error: %v", err)
+	}
+	p, ok := tool.provider.(*OpenAISearchProvider)
+	if !ok {
+		t.Fatalf("provider type = %T, want *OpenAISearchProvider", tool.provider)
+	}
+	if p.model != "grok-4-fast" {
+		t.Fatalf("provider model = %q", p.model)
+	}
+	if p.provider == nil {
+		t.Fatal("expected OpenAI search provider to be initialized")
+	}
+}
+
+func TestWebTool_OpenAISearch_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			t.Errorf("Expected POST request, got %s", r.Method)
 		}
-		if r.Header.Get("Content-Type") != "application/json" {
-			t.Errorf("Expected Content-Type application/json, got %s", r.Header.Get("Content-Type"))
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Errorf("Expected /v1/chat/completions path, got %s", r.URL.Path)
 		}
-		if r.Header.Get("Authorization") != "Bearer test-glm-key" {
-			t.Errorf("Expected Authorization Bearer test-glm-key, got %s", r.Header.Get("Authorization"))
+		if auth := r.Header.Get("Authorization"); auth != "Bearer search-key" {
+			t.Errorf("Expected Bearer auth, got %q", auth)
 		}
-
+		if contentType := r.Header.Get("Content-Type"); contentType != "application/json" {
+			t.Errorf("Expected Content-Type application/json, got %q", contentType)
+		}
 		var payload map[string]any
-		json.NewDecoder(r.Body).Decode(&payload)
-		if payload["search_query"] != "test query" {
-			t.Errorf("Expected search_query 'test query', got %v", payload["search_query"])
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
 		}
-		if payload["search_engine"] != "search_std" {
-			t.Errorf("Expected search_engine 'search_std', got %v", payload["search_engine"])
+		if payload["model"] != "grok-4-fast" {
+			t.Errorf("Expected model grok-4-fast, got %#v", payload["model"])
+		}
+		if payload["max_tokens"] != float64(8192) {
+			t.Errorf("Expected max_tokens 8192, got %#v", payload["max_tokens"])
+		}
+		if payload["temperature"] != 1.0 {
+			t.Errorf("Expected temperature 1.0, got %#v", payload["temperature"])
 		}
 
-		response := map[string]any{
-			"id":      "web-search-test",
-			"created": 1709568000,
-			"search_result": []map[string]any{
-				{
-					"title":        "Test GLM Result",
-					"content":      "GLM search snippet",
-					"link":         "https://example.com/glm",
-					"media":        "Example",
-					"publish_date": "2026-03-04",
-				},
-			},
+		messages, ok := payload["messages"].([]any)
+		if !ok || len(messages) != 2 {
+			t.Fatalf("Expected 2 messages, got %#v", payload["messages"])
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		userMessage, ok := messages[1].(map[string]any)
+		if !ok {
+			t.Fatalf("Unexpected user message payload: %#v", messages[1])
+		}
+		if content := userMessage["content"]; !strings.Contains(fmt.Sprint(content), "bilibili 热门视频top10") {
+			t.Errorf("Expected search query in user content, got %#v", content)
+		}
+
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{{
+				"message": map[string]any{
+					"role":    "assistant",
+					"content": "1. foo\n链接: https://example.com/foo",
+				},
+			}},
+		})
 	}))
 	defer server.Close()
 
 	tool, err := NewWebSearchTool(WebSearchToolOptions{
-		GLMSearchEnabled: true,
-		GLMSearchAPIKey:  "test-glm-key",
-		GLMSearchBaseURL: server.URL,
-		GLMSearchEngine:  "search_std",
+		SearchProvider:      "openai",
+		OpenAISearchEnabled: true,
+		OpenAISearchAPIKey:  "search-key",
+		OpenAISearchBaseURL: server.URL + "/v1/chat/completions",
+		OpenAISearchModel:   "grok-4-fast",
 	})
 	if err != nil {
 		t.Fatalf("NewWebSearchTool() error: %v", err)
 	}
 
 	result := tool.Execute(context.Background(), map[string]any{
-		"query": "test query",
+		"query": "bilibili 热门视频top10",
+		"count": float64(10),
 	})
-
 	if result.IsError {
-		t.Errorf("Expected success, got IsError=true: %s", result.ForLLM)
+		t.Fatalf("Expected success, got error: %s", result.ForLLM)
 	}
-	if !strings.Contains(result.ForUser, "Test GLM Result") {
-		t.Errorf("Expected 'Test GLM Result' in output, got: %s", result.ForUser)
-	}
-	if !strings.Contains(result.ForUser, "https://example.com/glm") {
-		t.Errorf("Expected URL in output, got: %s", result.ForUser)
-	}
-	if !strings.Contains(result.ForUser, "via GLM Search") {
-		t.Errorf("Expected 'via GLM Search' in output, got: %s", result.ForUser)
-	}
-}
-
-func TestWebTool_GLMSearch_APIError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"error":"invalid api key"}`))
-	}))
-	defer server.Close()
-
-	tool, err := NewWebSearchTool(WebSearchToolOptions{
-		GLMSearchEnabled: true,
-		GLMSearchAPIKey:  "bad-key",
-		GLMSearchBaseURL: server.URL,
-		GLMSearchEngine:  "search_std",
-	})
-	if err != nil {
-		t.Fatalf("NewWebSearchTool() error: %v", err)
-	}
-
-	result := tool.Execute(context.Background(), map[string]any{
-		"query": "test query",
-	})
-
-	if !result.IsError {
-		t.Errorf("Expected IsError=true for 401 response")
-	}
-	if !strings.Contains(result.ForLLM, "status 401") {
-		t.Errorf("Expected status 401 in error, got: %s", result.ForLLM)
-	}
-}
-
-func TestWebTool_GLMSearch_Priority(t *testing.T) {
-	// GLM Search should only be selected when all other providers are disabled
-	tool, err := NewWebSearchTool(WebSearchToolOptions{
-		DuckDuckGoEnabled:    true,
-		DuckDuckGoMaxResults: 5,
-		GLMSearchEnabled:     true,
-		GLMSearchAPIKey:      "test-key",
-		GLMSearchBaseURL:     "https://example.com",
-		GLMSearchEngine:      "search_std",
-	})
-	if err != nil {
-		t.Fatalf("NewWebSearchTool() error: %v", err)
-	}
-
-	// DuckDuckGo should win over GLM Search
-	if _, ok := tool.provider.(*DuckDuckGoSearchProvider); !ok {
-		t.Errorf("Expected DuckDuckGoSearchProvider when both enabled, got %T", tool.provider)
-	}
-
-	// With DuckDuckGo disabled, GLM Search should be selected
-	tool2, err := NewWebSearchTool(WebSearchToolOptions{
-		DuckDuckGoEnabled: false,
-		GLMSearchEnabled:  true,
-		GLMSearchAPIKey:   "test-key",
-		GLMSearchBaseURL:  "https://example.com",
-		GLMSearchEngine:   "search_std",
-	})
-	if err != nil {
-		t.Fatalf("NewWebSearchTool() error: %v", err)
-	}
-	if _, ok := tool2.provider.(*GLMSearchProvider); !ok {
-		t.Errorf("Expected GLMSearchProvider when only GLM enabled, got %T", tool2.provider)
+	if !strings.Contains(result.ForLLM, "https://example.com/foo") {
+		t.Fatalf("Expected URL in result, got %s", result.ForLLM)
 	}
 }

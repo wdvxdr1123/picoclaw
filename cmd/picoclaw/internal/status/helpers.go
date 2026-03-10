@@ -59,6 +59,7 @@ func statusCmd() {
 	fmt.Println("Zhipu API:", status(get("zhipu").APIKey != ""))
 	fmt.Println("Qwen API:", status(get("qwen").APIKey != ""))
 	fmt.Println("Groq API:", status(get("groq").APIKey != ""))
+	fmt.Println("Kimi API:", status(get("kimi").APIKey != ""))
 	fmt.Println("Moonshot API:", status(get("moonshot").APIKey != ""))
 	fmt.Println("DeepSeek API:", status(get("deepseek").APIKey != ""))
 	fmt.Println("VolcEngine API:", status(get("volcengine").APIKey != ""))

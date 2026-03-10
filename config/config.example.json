@@ -23,6 +23,11 @@
       "api_key": "sk-ant-your-key",
       "api_base": "https://api.anthropic.com/v1"
     },
+    "kimi": {
+      "type": "kimi",
+      "api_key": "sk-your-kimi-key",
+      "api_base": "https://api.moonshot.ai/v1"
+    },
     "antigravity": {
       "type": "antigravity",
       "auth_method": "oauth"
@@ -55,6 +60,10 @@
       "provider": "anthropic",
       "model": "claude-sonnet-4.6",
       "thinking_level": "high"
+    },
+    "kimi-k2.5-official": {
+      "provider": "kimi",
+      "model": "kimi-k2.5"
     },
     "gemini": {
       "provider": "antigravity",
@@ -220,37 +229,12 @@
     "allow_write_paths": null,
     "web": {
       "enabled": true,
-      "brave": {
-        "enabled": false,
-        "api_key": "YOUR_BRAVE_API_KEY",
-        "max_results": 5
-      },
-      "tavily": {
+      "search_provider": "auto",
+      "openai_search": {
         "enabled": false,
         "api_key": "",
         "base_url": "",
-        "max_results": 0
-      },
-      "duckduckgo": {
-        "enabled": true,
-        "max_results": 5
-      },
-      "perplexity": {
-        "enabled": false,
-        "api_key": "",
-        "max_results": 5
-      },
-      "searxng": {
-        "enabled": false,
-        "base_url": "http://localhost:8888",
-        "max_results": 5
-      },
-      "glm_search": {
-        "enabled": false,
-        "api_key": "",
-        "base_url": "https://open.bigmodel.cn/api/paas/v4/web_search",
-        "search_engine": "search_std",
-        "max_results": 5
+        "model": "grok-4-fast"
       },
       "fetch_limit_bytes": 10485760
     },
@@ -287,17 +271,6 @@
           ],
           "env": {
             "GITHUB_PERSONAL_ACCESS_TOKEN": "YOUR_GITHUB_TOKEN"
-          }
-        },
-        "brave-search": {
-          "enabled": false,
-          "command": "npx",
-          "args": [
-            "-y",
-            "@modelcontextprotocol/server-brave-search"
-          ],
-          "env": {
-            "BRAVE_API_KEY": "YOUR_BRAVE_API_KEY"
           }
         },
         "postgres": {
