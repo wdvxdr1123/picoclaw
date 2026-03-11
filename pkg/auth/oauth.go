@@ -28,15 +28,18 @@ type OAuthProviderConfig struct {
 	Scopes       string
 	Originator   string
 	Port         int
+	// DeviceAuthEndpoint is an optional override for the device auth endpoint
+	DeviceAuthEndpoint string
 }
 
 func OpenAIOAuthConfig() OAuthProviderConfig {
 	return OAuthProviderConfig{
-		Issuer:     "https://auth.openai.com",
-		ClientID:   "app_EMoamEEZ73f0CkXaXp7hrann",
-		Scopes:     "openid profile email offline_access",
-		Originator: "codex_cli_rs",
-		Port:       1455,
+		Issuer:             "https://auth.openai.com",
+		ClientID:           "app_EMoamEEZ73f0CkXaXp7hrann",
+		Scopes:             "openid profile email offline_access",
+		Originator:         "picoclaw",
+		Port:               1455,
+		DeviceAuthEndpoint: "https://auth.openai.com/api/accounts/deviceauth",
 	}
 }
 
@@ -545,16 +548,21 @@ func parseTokenResponse(body []byte, provider string) (*AuthCredential, error) {
 		AuthMethod:   "oauth",
 	}
 
+	// Extract account ID from tokens
+	// Priority: id_token > access_token (OpenAI may include it in either)
 	if accountID := extractAccountID(tokenResp.IDToken); accountID != "" {
 		cred.AccountID = accountID
 	} else if accountID := extractAccountID(tokenResp.AccessToken); accountID != "" {
 		cred.AccountID = accountID
-	} else if accountID := extractAccountID(tokenResp.IDToken); accountID != "" {
-		// Recent OpenAI OAuth responses may only include chatgpt_account_id in id_token claims.
-		cred.AccountID = accountID
 	}
 
 	return cred, nil
+}
+
+// ExtractAccountID extracts the ChatGPT account ID from a JWT token.
+// It checks multiple possible claim paths based on OpenAI's JWT structure.
+func ExtractAccountID(token string) string {
+	return extractAccountID(token)
 }
 
 func extractAccountID(token string) string {
@@ -563,20 +571,24 @@ func extractAccountID(token string) string {
 		return ""
 	}
 
+	// Check standard chatgpt_account_id claim
 	if accountID, ok := claims["chatgpt_account_id"].(string); ok && accountID != "" {
 		return accountID
 	}
 
+	// Check nested auth claim (https://api.openai.com/auth.chatgpt_account_id)
 	if accountID, ok := claims["https://api.openai.com/auth.chatgpt_account_id"].(string); ok && accountID != "" {
 		return accountID
 	}
 
+	// Check nested auth object claim
 	if authClaim, ok := claims["https://api.openai.com/auth"].(map[string]any); ok {
 		if accountID, ok := authClaim["chatgpt_account_id"].(string); ok && accountID != "" {
 			return accountID
 		}
 	}
 
+	// Check organizations array
 	if orgs, ok := claims["organizations"].([]any); ok {
 		for _, org := range orgs {
 			if orgMap, ok := org.(map[string]any); ok {

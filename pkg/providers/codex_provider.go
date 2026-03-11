@@ -18,6 +18,15 @@ import (
 const (
 	codexDefaultModel        = "gpt-5.2"
 	codexDefaultInstructions = "You are Codex, a coding assistant."
+
+	// Supported Codex models via OpenAI subscription
+	codexModelGPT52     = "gpt-5.2"
+	codexModelGPT54     = "gpt-5.4"
+	codexModelGPT51Codex     = "gpt-5.1-codex"
+	codexModelGPT52Codex     = "gpt-5.2-codex"
+	codexModelGPT53Codex     = "gpt-5.3-codex"
+	codexModelGPT51CodexMax  = "gpt-5.1-codex-max"
+	codexModelGPT51CodexMini = "gpt-5.1-codex-mini"
 )
 
 type CodexProvider struct {
@@ -169,6 +178,33 @@ func resolveCodexModel(model string) (string, string) {
 		return codexDefaultModel, "non-openai model namespace"
 	}
 
+	// List of supported Codex models via OpenAI subscription
+	supportedCodexModels := map[string]bool{
+		codexModelGPT52:          true,
+		codexModelGPT54:          true,
+		codexModelGPT51Codex:     true,
+		codexModelGPT52Codex:     true,
+		codexModelGPT53Codex:     true,
+		codexModelGPT51CodexMax:  true,
+		codexModelGPT51CodexMini: true,
+	}
+
+	// Check if it's a supported Codex model
+	if supportedCodexModels[m] {
+		return m, ""
+	}
+
+	// Allow any gpt-5.x model for future compatibility
+	if strings.HasPrefix(m, "gpt-5") {
+		return m, ""
+	}
+
+	// Allow any o3 or o4 model
+	if strings.HasPrefix(m, "o3") || strings.HasPrefix(m, "o4") {
+		return m, ""
+	}
+
+	// Block clearly unsupported models
 	unsupportedPrefixes := []string{
 		"glm",
 		"claude",
@@ -192,7 +228,8 @@ func resolveCodexModel(model string) (string, string) {
 		}
 	}
 
-	if strings.HasPrefix(m, "gpt-") || strings.HasPrefix(m, "o3") || strings.HasPrefix(m, "o4") {
+	// For gpt-4 and other GPT models, try them (Codex backend may support them)
+	if strings.HasPrefix(m, "gpt-") {
 		return m, ""
 	}
 

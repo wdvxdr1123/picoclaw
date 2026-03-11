@@ -83,8 +83,8 @@ func TestBuildAuthorizeURLOpenAIExtras(t *testing.T) {
 	if q.Get("codex_cli_simplified_flow") != "true" {
 		t.Errorf("codex_cli_simplified_flow = %q, want true", q.Get("codex_cli_simplified_flow"))
 	}
-	if q.Get("originator") != "codex_cli_rs" {
-		t.Errorf("originator = %q, want codex_cli_rs", q.Get("originator"))
+	if q.Get("originator") != "picoclaw" {
+		t.Errorf("originator = %q, want picoclaw", q.Get("originator"))
 	}
 }
 

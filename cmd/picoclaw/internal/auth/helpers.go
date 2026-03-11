@@ -2,13 +2,9 @@ package auth
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/sipeed/picoclaw/cmd/picoclaw/internal"
 	"github.com/sipeed/picoclaw/pkg/auth"
@@ -16,71 +12,41 @@ import (
 )
 
 const (
-	supportedProvidersMsg = "supported providers: openai, anthropic, google-antigravity"
-	defaultAnthropicModel = "claude-sonnet-4.6"
+	supportedProvidersMsg = "supported providers: openai"
+	defaultOpenAIModel    = "gpt-5.2"
 )
 
-func authLoginCmd(provider string, useDeviceCode bool, useOauth bool) error {
+// OpenAIModels contains the list of supported OpenAI models via subscription
+var OpenAIModels = []string{
+	"gpt-5.2",
+	"gpt-5.4",
+	"gpt-5.1-codex",
+	"gpt-5.2-codex",
+	"gpt-5.3-codex",
+	"gpt-5.1-codex-max",
+	"gpt-5.1-codex-mini",
+}
+
+func authLoginCmd(provider string, useDeviceCode bool) error {
 	switch provider {
 	case "openai":
-		return authLoginOpenAI(useDeviceCode)
-	case "anthropic":
-		return authLoginAnthropic(useOauth)
+		return authLoginOpenAIInteractive(useDeviceCode)
 	default:
 		return fmt.Errorf("unsupported provider: %s (%s)", provider, supportedProvidersMsg)
 	}
 }
 
-func authLoginOpenAI(useDeviceCode bool) error {
-	cfg := auth.OpenAIOAuthConfig()
-
-	var cred *auth.AuthCredential
-	var err error
-
+func authLoginOpenAIInteractive(useDeviceCode bool) error {
+	// If --device-code flag is explicitly set, use device code flow directly
 	if useDeviceCode {
-		cred, err = auth.LoginDeviceCode(cfg)
-	} else {
-		cred, err = auth.LoginBrowser(cfg)
+		return authLoginOpenAIDeviceCode()
 	}
 
-	if err != nil {
-		return fmt.Errorf("login failed: %w", err)
-	}
-
-	if err = auth.SetCredential("openai", cred); err != nil {
-		return fmt.Errorf("failed to save credentials: %w", err)
-	}
-
-	appCfg, err := internal.LoadConfig()
-	if err == nil {
-		ensureProviderConfig(appCfg, "openai", func(cfg *config.ProviderConfig) {
-			cfg.AuthMethod = "oauth"
-		})
-		ensureNamedModel(appCfg, "gpt-5.2", "openai", "gpt-5.2")
-		setDefaultModel(appCfg, "gpt-5.2")
-
-		if err = config.SaveConfig(internal.GetConfigPath(), appCfg); err != nil {
-			return fmt.Errorf("could not update config: %w", err)
-		}
-	}
-
-	fmt.Println("Login successful!")
-	if cred.AccountID != "" {
-		fmt.Printf("Account: %s\n", cred.AccountID)
-	}
-	fmt.Println("Default model set to: gpt-5.2")
-
-	return nil
-}
-
-func authLoginAnthropic(useOauth bool) error {
-	if useOauth {
-		return authLoginAnthropicSetupToken()
-	}
-
-	fmt.Println("Anthropic login method:")
-	fmt.Println("  1) Setup token (from `claude setup-token`) (Recommended)")
-	fmt.Println("  2) API key (from console.anthropic.com)")
+	// Interactive login method selection
+	fmt.Println("OpenAI login method:")
+	fmt.Println("  1) ChatGPT Pro/Plus (browser) - Recommended")
+	fmt.Println("  2) ChatGPT Pro/Plus (device code) - For headless environments")
+	fmt.Println("  3) API Key (from platform.openai.com)")
 
 	scanner := bufio.NewScanner(os.Stdin)
 	for {
@@ -95,74 +61,135 @@ func authLoginAnthropic(useOauth bool) error {
 
 		switch choice {
 		case "1":
-			return authLoginAnthropicSetupToken()
+			return authLoginOpenAIBrowser()
 		case "2":
-			return authLoginPasteToken("anthropic")
+			return authLoginOpenAIDeviceCode()
+		case "3":
+			return authLoginOpenAIAPIKey()
 		default:
-			fmt.Printf("Invalid choice: %s. Please enter 1 or 2.\n", choice)
+			fmt.Printf("Invalid choice: %s. Please enter 1, 2, or 3.\n", choice)
 		}
 	}
 }
 
-func authLoginAnthropicSetupToken() error {
-	cred, err := auth.LoginSetupToken(os.Stdin)
+func authLoginOpenAIBrowser() error {
+	cfg := auth.OpenAIOAuthConfig()
+
+	cred, err := auth.LoginBrowser(cfg)
 	if err != nil {
 		return fmt.Errorf("login failed: %w", err)
 	}
 
-	if err = auth.SetCredential("anthropic", cred); err != nil {
+	if err = auth.SetCredential("openai", cred); err != nil {
 		return fmt.Errorf("failed to save credentials: %w", err)
 	}
 
 	appCfg, err := internal.LoadConfig()
 	if err == nil {
-		ensureProviderConfig(appCfg, "anthropic", func(cfg *config.ProviderConfig) {
+		ensureProviderConfig(appCfg, "openai", func(cfg *config.ProviderConfig) {
 			cfg.AuthMethod = "oauth"
 		})
-		ensureNamedModel(appCfg, defaultAnthropicModel, "anthropic", defaultAnthropicModel)
-		if appCfg.GetDefaultModelName() == "" {
-			setDefaultModel(appCfg, defaultAnthropicModel)
-		}
+		ensureOpenAIModels(appCfg, "openai")
+		setDefaultModel(appCfg, defaultOpenAIModel)
 
-		if err := config.SaveConfig(internal.GetConfigPath(), appCfg); err != nil {
+		if err = config.SaveConfig(internal.GetConfigPath(), appCfg); err != nil {
 			return fmt.Errorf("could not update config: %w", err)
 		}
 	}
 
-	fmt.Println("Setup token saved for Anthropic!")
+	fmt.Println("Login successful!")
+	if cred.AccountID != "" {
+		fmt.Printf("Account: %s\n", cred.AccountID)
+	}
+	fmt.Printf("Default model set to: %s\n", defaultOpenAIModel)
+	fmt.Println("\nAvailable models:")
+	for _, model := range OpenAIModels {
+		fmt.Printf("  - %s\n", model)
+	}
 
 	return nil
 }
 
-func fetchGoogleUserEmail(accessToken string) (string, error) {
-	req, err := http.NewRequest("GET", "https://www.googleapis.com/oauth2/v2/userinfo", nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
+func authLoginOpenAIDeviceCode() error {
+	cfg := auth.OpenAIOAuthConfig()
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	cred, err := auth.LoginDeviceCode(cfg)
 	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("reading userinfo response: %w", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("userinfo request failed: %s", string(body))
+		return fmt.Errorf("login failed: %w", err)
 	}
 
-	var userInfo struct {
-		Email string `json:"email"`
+	if err = auth.SetCredential("openai", cred); err != nil {
+		return fmt.Errorf("failed to save credentials: %w", err)
 	}
-	if err := json.Unmarshal(body, &userInfo); err != nil {
-		return "", err
+
+	appCfg, err := internal.LoadConfig()
+	if err == nil {
+		ensureProviderConfig(appCfg, "openai", func(cfg *config.ProviderConfig) {
+			cfg.AuthMethod = "oauth"
+		})
+		ensureOpenAIModels(appCfg, "openai")
+		setDefaultModel(appCfg, defaultOpenAIModel)
+
+		if err = config.SaveConfig(internal.GetConfigPath(), appCfg); err != nil {
+			return fmt.Errorf("could not update config: %w", err)
+		}
 	}
-	return userInfo.Email, nil
+
+	fmt.Println("Login successful!")
+	if cred.AccountID != "" {
+		fmt.Printf("Account: %s\n", cred.AccountID)
+	}
+	fmt.Printf("Default model set to: %s\n", defaultOpenAIModel)
+	fmt.Println("\nAvailable models:")
+	for _, model := range OpenAIModels {
+		fmt.Printf("  - %s\n", model)
+	}
+
+	return nil
+}
+
+func authLoginOpenAIAPIKey() error {
+	fmt.Println("\nTo use your OpenAI API key:")
+	fmt.Println("1. Go to https://platform.openai.com/api-keys")
+	fmt.Println("2. Create a new API key")
+	fmt.Println("3. Paste it below")
+	fmt.Println()
+
+	cred, err := auth.LoginPasteToken("openai", os.Stdin)
+	if err != nil {
+		return fmt.Errorf("login failed: %w", err)
+	}
+
+	if err = auth.SetCredential("openai", cred); err != nil {
+		return fmt.Errorf("failed to save credentials: %w", err)
+	}
+
+	appCfg, err := internal.LoadConfig()
+	if err == nil {
+		ensureProviderConfig(appCfg, "openai", func(cfg *config.ProviderConfig) {
+			cfg.AuthMethod = "token"
+		})
+		// For API key, we use standard OpenAI API models
+		ensureNamedModel(appCfg, "gpt-4o", "openai", "gpt-4o")
+		ensureNamedModel(appCfg, "gpt-4o-mini", "openai", "gpt-4o-mini")
+		ensureNamedModel(appCfg, "o3-mini", "openai", "o3-mini")
+		ensureNamedModel(appCfg, "o1", "openai", "o1")
+		setDefaultModel(appCfg, "gpt-4o")
+
+		if err = config.SaveConfig(internal.GetConfigPath(), appCfg); err != nil {
+			return fmt.Errorf("could not update config: %w", err)
+		}
+	}
+
+	fmt.Println("API Key saved for OpenAI!")
+	fmt.Println("Default model set to: gpt-4o")
+	fmt.Println("\nAvailable models via API:")
+	fmt.Println("  - gpt-4o")
+	fmt.Println("  - gpt-4o-mini")
+	fmt.Println("  - o3-mini")
+	fmt.Println("  - o1")
+
+	return nil
 }
 
 func authLoginPasteToken(provider string) error {
@@ -178,12 +205,6 @@ func authLoginPasteToken(provider string) error {
 	appCfg, err := internal.LoadConfig()
 	if err == nil {
 		switch provider {
-		case "anthropic":
-			ensureProviderConfig(appCfg, "anthropic", func(cfg *config.ProviderConfig) {
-				cfg.AuthMethod = "token"
-			})
-			ensureNamedModel(appCfg, defaultAnthropicModel, "anthropic", defaultAnthropicModel)
-			setDefaultModel(appCfg, defaultAnthropicModel)
 		case "openai":
 			ensureProviderConfig(appCfg, "openai", func(cfg *config.ProviderConfig) {
 				cfg.AuthMethod = "token"
@@ -218,14 +239,6 @@ func authLogoutCmd(provider string) error {
 				ensureProviderConfig(appCfg, "openai", func(cfg *config.ProviderConfig) {
 					cfg.AuthMethod = ""
 				})
-			case "anthropic":
-				ensureProviderConfig(appCfg, "anthropic", func(cfg *config.ProviderConfig) {
-					cfg.AuthMethod = ""
-				})
-			case "google-antigravity", "antigravity":
-				ensureProviderConfig(appCfg, "antigravity", func(cfg *config.ProviderConfig) {
-					cfg.AuthMethod = ""
-				})
 			}
 			config.SaveConfig(internal.GetConfigPath(), appCfg)
 		}
@@ -242,12 +255,6 @@ func authLogoutCmd(provider string) error {
 	appCfg, err := internal.LoadConfig()
 	if err == nil {
 		ensureProviderConfig(appCfg, "openai", func(cfg *config.ProviderConfig) {
-			cfg.AuthMethod = ""
-		})
-		ensureProviderConfig(appCfg, "anthropic", func(cfg *config.ProviderConfig) {
-			cfg.AuthMethod = ""
-		})
-		ensureProviderConfig(appCfg, "antigravity", func(cfg *config.ProviderConfig) {
 			cfg.AuthMethod = ""
 		})
 		config.SaveConfig(internal.GetConfigPath(), appCfg)
@@ -295,39 +302,9 @@ func authStatusCmd() error {
 		if !cred.ExpiresAt.IsZero() {
 			fmt.Printf("    Expires: %s\n", cred.ExpiresAt.Format("2006-01-02 15:04"))
 		}
-
-		if provider == "anthropic" && cred.AuthMethod == "oauth" {
-			usage, err := auth.FetchAnthropicUsage(cred.AccessToken)
-			if err != nil {
-				fmt.Printf("    Usage: unavailable (%v)\n", err)
-			} else {
-				fmt.Printf("    Usage (5h):  %.1f%%\n", usage.FiveHourUtilization*100)
-				fmt.Printf("    Usage (7d):  %.1f%%\n", usage.SevenDayUtilization*100)
-			}
-		}
 	}
 
 	return nil
-}
-
-// isAntigravityModel checks if a model string belongs to antigravity provider
-func isAntigravityModel(model string) bool {
-	return model == "antigravity" ||
-		model == "google-antigravity" ||
-		strings.HasPrefix(model, "antigravity/") ||
-		strings.HasPrefix(model, "google-antigravity/")
-}
-
-// isOpenAIModel checks if a model string belongs to openai provider
-func isOpenAIModel(model string) bool {
-	return model == "openai" ||
-		strings.HasPrefix(model, "openai/")
-}
-
-// isAnthropicModel checks if a model string belongs to anthropic provider
-func isAnthropicModel(model string) bool {
-	return model == "anthropic" ||
-		strings.HasPrefix(model, "anthropic/")
 }
 
 func ensureProviderConfig(appCfg *config.Config, name string, update func(*config.ProviderConfig)) {
@@ -358,4 +335,11 @@ func ensureNamedModel(appCfg *config.Config, alias, provider, model string) {
 func setDefaultModel(appCfg *config.Config, alias string) {
 	appCfg.Agents.Defaults.Model = alias
 	appCfg.Agents.Defaults.ModelName = ""
+}
+
+// ensureOpenAIModels sets up all supported OpenAI models in the config
+func ensureOpenAIModels(appCfg *config.Config, provider string) {
+	for _, model := range OpenAIModels {
+		ensureNamedModel(appCfg, model, provider, model)
+	}
 }

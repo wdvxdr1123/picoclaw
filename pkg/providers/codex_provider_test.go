@@ -601,6 +601,16 @@ func TestResolveCodexModel(t *testing.T) {
 		{name: "non-openai prefixed", input: "glm-4.7", wantModel: codexDefaultModel, wantFallback: true},
 		{name: "openai prefix", input: "openai/gpt-5.2", wantModel: "gpt-5.2", wantFallback: false},
 		{name: "direct gpt", input: "gpt-4o", wantModel: "gpt-4o", wantFallback: false},
+		// New Codex models via OpenAI subscription
+		{name: "gpt-5.4", input: "gpt-5.4", wantModel: "gpt-5.4", wantFallback: false},
+		{name: "gpt-5.1-codex", input: "gpt-5.1-codex", wantModel: "gpt-5.1-codex", wantFallback: false},
+		{name: "gpt-5.2-codex", input: "gpt-5.2-codex", wantModel: "gpt-5.2-codex", wantFallback: false},
+		{name: "gpt-5.3-codex", input: "gpt-5.3-codex", wantModel: "gpt-5.3-codex", wantFallback: false},
+		{name: "gpt-5.1-codex-max", input: "gpt-5.1-codex-max", wantModel: "gpt-5.1-codex-max", wantFallback: false},
+		{name: "gpt-5.1-codex-mini", input: "gpt-5.1-codex-mini", wantModel: "gpt-5.1-codex-mini", wantFallback: false},
+		{name: "gpt-5.2 with prefix", input: "openai/gpt-5.2", wantModel: "gpt-5.2", wantFallback: false},
+		{name: "o3 models", input: "o3-mini", wantModel: "o3-mini", wantFallback: false},
+		{name: "o4 models", input: "o4-preview", wantModel: "o4-preview", wantFallback: false},
 	}
 
 	for _, tt := range tests {
