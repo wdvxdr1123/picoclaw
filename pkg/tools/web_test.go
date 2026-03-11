@@ -492,6 +492,98 @@ func TestNewWebSearchTool_OpenAISelectedWhenConfigured(t *testing.T) {
 	}
 }
 
+func TestWebTool_WebFetch_Markdown(t *testing.T) {
+	htmlContent := `<html><body><h1>Test Title</h1><p>This is a <strong>bold</strong> paragraph with <a href="https://example.com">a link</a>.</p><ul><li>Item 1</li><li>Item 2</li></ul></body></html>`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(htmlContent))
+	}))
+	defer server.Close()
+
+	tool, err := NewWebFetchTool(50000, testFetchLimit)
+	if err != nil {
+		t.Fatalf("Failed to create web fetch tool: %v", err)
+	}
+
+	result := tool.Execute(context.Background(), map[string]any{
+		"url":    server.URL,
+		"format": "markdown",
+	})
+	if result.IsError {
+		t.Errorf("Expected success, got IsError=true: %s", result.ForLLM)
+	}
+
+	// Check that markdown content is present
+	if !strings.Contains(result.ForLLM, "Test Title") {
+		t.Errorf("Expected ForLLM to contain 'Test Title', got: %s", result.ForLLM)
+	}
+	// Check for markdown formatting
+	if !strings.Contains(result.ForLLM, "**bold**") {
+		t.Errorf("Expected ForLLM to contain markdown bold '**bold**', got: %s", result.ForLLM)
+	}
+	// Check extractor is set to markdown
+	if !strings.Contains(result.ForLLM, `"extractor": "markdown"`) {
+		t.Errorf("Expected extractor to be 'markdown', got: %s", result.ForLLM)
+	}
+}
+
+func TestWebTool_WebFetch_MarkdownWithDomain(t *testing.T) {
+	htmlContent := `<html><body><img src="/assets/image.png" /><a href="/page">Link</a></body></html>`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(htmlContent))
+	}))
+	defer server.Close()
+
+	tool, err := NewWebFetchTool(50000, testFetchLimit)
+	if err != nil {
+		t.Fatalf("Failed to create web fetch tool: %v", err)
+	}
+
+	result := tool.Execute(context.Background(), map[string]any{
+		"url":    server.URL,
+		"format": "markdown",
+	})
+	if result.IsError {
+		t.Errorf("Expected success, got IsError=true: %s", result.ForLLM)
+	}
+
+	// Check that relative URLs are converted to absolute
+	if !strings.Contains(result.ForLLM, server.URL) {
+		t.Errorf("Expected ForLLM to contain absolute URLs with domain, got: %s", result.ForLLM)
+	}
+}
+
+func TestWebTool_WebFetch_DefaultFormat(t *testing.T) {
+	htmlContent := `<html><body><h1>Test Title</h1><p>Content here</p></body></html>`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(htmlContent))
+	}))
+	defer server.Close()
+
+	tool, err := NewWebFetchTool(50000, testFetchLimit)
+	if err != nil {
+		t.Fatalf("Failed to create web fetch tool: %v", err)
+	}
+
+	// No format specified, should default to markdown
+	result := tool.Execute(context.Background(), map[string]any{
+		"url": server.URL,
+	})
+	if result.IsError {
+		t.Errorf("Expected success, got IsError=true: %s", result.ForLLM)
+	}
+
+	// Check extractor is set to markdown (default)
+	if !strings.Contains(result.ForLLM, `"extractor": "markdown"`) {
+		t.Errorf("Expected extractor to be 'markdown' by default, got: %s", result.ForLLM)
+	}
+}
+
 func TestWebTool_OpenAISearch_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {

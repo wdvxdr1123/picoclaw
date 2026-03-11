@@ -21,6 +21,8 @@ require (
 )
 
 require (
+	github.com/JohannesKaufmann/dom v0.2.0 // indirect
+	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gdamore/encoding v1.0.1 // indirect
 	github.com/go-resty/resty/v2 v2.6.0 // indirect

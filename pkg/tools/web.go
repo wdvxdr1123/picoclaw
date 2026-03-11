@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	htmltomarkdown "github.com/JohannesKaufmann/html-to-markdown/v2"
+	"github.com/JohannesKaufmann/html-to-markdown/v2/converter"
 	"github.com/sipeed/picoclaw/pkg/providers"
 )
 
@@ -313,7 +315,7 @@ func (t *WebFetchTool) Name() string {
 }
 
 func (t *WebFetchTool) Description() string {
-	return "Fetch a URL and extract readable content (HTML to text)."
+	return "Fetch a URL and extract readable content. Markdown format is used by default and recommended for HTML pages as it better preserves document structure, links, and formatting."
 }
 
 func (t *WebFetchTool) Parameters() map[string]any {
@@ -328,6 +330,11 @@ func (t *WebFetchTool) Parameters() map[string]any {
 				"type":        "integer",
 				"description": "Maximum characters to extract",
 				"minimum":     100.0,
+			},
+			"format": map[string]any{
+				"type":        "string",
+				"description": "Output format. Defaults to 'markdown' (recommended) which preserves document structure, links, and formatting. Use 'text' for plain text extraction only.",
+				"enum":        []string{"markdown", "text"},
 			},
 		},
 		"required": []string{"url"},
@@ -378,6 +385,12 @@ func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) *ToolRe
 		return ErrorResult(fmt.Sprintf("failed to read response: %v", err))
 	}
 
+	// Determine output format
+	outputFormat := "markdown"
+	if f, ok := args["format"].(string); ok && f != "" {
+		outputFormat = strings.ToLower(f)
+	}
+
 	contentType := resp.Header.Get("Content-Type")
 	var text, extractor string
 	if strings.Contains(contentType, "application/json") {
@@ -392,8 +405,13 @@ func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) *ToolRe
 		}
 	} else if strings.Contains(contentType, "text/html") || len(body) > 0 &&
 		(strings.HasPrefix(string(body), "<!DOCTYPE") || strings.HasPrefix(strings.ToLower(string(body)), "<html")) {
-		text = t.extractText(string(body))
-		extractor = "text"
+		if outputFormat == "markdown" {
+			text = t.extractMarkdown(string(body), urlStr)
+			extractor = "markdown"
+		} else {
+			text = t.extractText(string(body))
+			extractor = "text"
+		}
 	} else {
 		text = string(body)
 		extractor = "raw"
@@ -440,4 +458,16 @@ func (t *WebFetchTool) extractText(htmlContent string) string {
 		}
 	}
 	return strings.Join(cleanLines, "\n")
+}
+
+func (t *WebFetchTool) extractMarkdown(htmlContent string, domain string) string {
+	markdown, err := htmltomarkdown.ConvertString(
+		htmlContent,
+		converter.WithDomain(domain),
+	)
+	if err != nil {
+		// Fallback to plain text extraction if conversion fails
+		return t.extractText(htmlContent)
+	}
+	return markdown
 }
