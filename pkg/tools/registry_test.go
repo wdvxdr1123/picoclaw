@@ -2,10 +2,12 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/sipeed/picoclaw/pkg/providers"
 )
 
@@ -14,24 +16,30 @@ import (
 type mockRegistryTool struct {
 	name   string
 	desc   string
-	params map[string]any
+	params *Schema
 	result *ToolResult
 }
 
-func (m *mockRegistryTool) Name() string               { return m.name }
-func (m *mockRegistryTool) Description() string        { return m.desc }
-func (m *mockRegistryTool) Parameters() map[string]any { return m.params }
+func (m *mockRegistryTool) Spec() *ToolSpec {
+	return &ToolSpec{
+		Name:        m.name,
+		Description: m.desc,
+		Parameters:  m.params,
+	}
+}
 func (m *mockRegistryTool) Execute(_ context.Context, _ map[string]any) *ToolResult {
 	return m.result
 }
 
 type mockContextAwareTool struct {
 	mockRegistryTool
-	lastCtx context.Context
+	lastCtx  context.Context
+	lastArgs map[string]any
 }
 
-func (m *mockContextAwareTool) Execute(ctx context.Context, _ map[string]any) *ToolResult {
+func (m *mockContextAwareTool) Execute(ctx context.Context, args map[string]any) *ToolResult {
 	m.lastCtx = ctx
+	m.lastArgs = args
 	return m.result
 }
 
@@ -51,7 +59,7 @@ func newMockTool(name, desc string) *mockRegistryTool {
 	return &mockRegistryTool{
 		name:   name,
 		desc:   desc,
-		params: map[string]any{"type": "object"},
+		params: schema(map[string]any{"type": "object"}),
 		result: SilentResult("ok"),
 	}
 }
@@ -77,8 +85,8 @@ func TestToolRegistry_RegisterAndGet(t *testing.T) {
 	if !ok {
 		t.Fatal("expected to find registered tool")
 	}
-	if got.Name() != "echo" {
-		t.Errorf("expected name 'echo', got %q", got.Name())
+	if got.Spec().Name != "echo" {
+		t.Errorf("expected name 'echo', got %q", got.Spec().Name)
 	}
 }
 
@@ -99,8 +107,8 @@ func TestToolRegistry_RegisterOverwrite(t *testing.T) {
 		t.Errorf("expected count 1 after overwrite, got %d", r.Count())
 	}
 	tool, _ := r.Get("dup")
-	if tool.Description() != "second" {
-		t.Errorf("expected overwritten description 'second', got %q", tool.Description())
+	if tool.Spec().Description != "second" {
+		t.Errorf("expected overwritten description 'second', got %q", tool.Spec().Description)
 	}
 }
 
@@ -109,7 +117,7 @@ func TestToolRegistry_Execute_Success(t *testing.T) {
 	r.Register(&mockRegistryTool{
 		name:   "greet",
 		desc:   "says hello",
-		params: map[string]any{},
+		params: schema(map[string]any{"type": "object"}),
 		result: SilentResult("hello"),
 	})
 
@@ -177,6 +185,63 @@ func TestToolRegistry_ExecuteWithContext_EmptyContext(t *testing.T) {
 	}
 }
 
+func TestToolRegistry_ExecuteWithContext_ValidatesParameters(t *testing.T) {
+	r := NewToolRegistry()
+	r.Register(&mockRegistryTool{
+		name: "validate_me",
+		desc: "validates arguments",
+		params: schema(&jsonschema.Schema{
+			Type: "object",
+			Properties: map[string]*jsonschema.Schema{
+				"path": {
+					Type:        "string",
+					Description: "Path to validate",
+				},
+			},
+			Required: []string{"path"},
+		}),
+		result: SilentResult("ok"),
+	})
+
+	result := r.Execute(context.Background(), "validate_me", map[string]any{})
+	if !result.IsError {
+		t.Fatal("expected validation failure")
+	}
+	if !strings.Contains(result.ForLLM, "invalid parameters") {
+		t.Fatalf("expected validation error, got %q", result.ForLLM)
+	}
+}
+
+func TestToolRegistry_ExecuteWithContext_AppliesSchemaDefaults(t *testing.T) {
+	r := NewToolRegistry()
+	ct := &mockContextAwareTool{
+		mockRegistryTool: mockRegistryTool{
+			name: "defaults_tool",
+			desc: "applies defaults",
+			params: schema(&jsonschema.Schema{
+				Type: "object",
+				Properties: map[string]*jsonschema.Schema{
+					"mode": {
+						Type:        "string",
+						Description: "Execution mode",
+						Default:     json.RawMessage(`"fast"`),
+					},
+				},
+			}),
+			result: SilentResult("ok"),
+		},
+	}
+	r.Register(ct)
+
+	result := r.Execute(context.Background(), "defaults_tool", map[string]any{})
+	if result.IsError {
+		t.Fatalf("expected success, got %q", result.ForLLM)
+	}
+	if ct.lastArgs["mode"] != "fast" {
+		t.Fatalf("expected schema default to be applied, got %#v", ct.lastArgs)
+	}
+}
+
 func TestToolRegistry_ExecuteWithContext_AsyncCallback(t *testing.T) {
 	r := NewToolRegistry()
 	at := &mockAsyncRegistryTool{
@@ -231,7 +296,7 @@ func TestToolRegistry_ToProviderDefs(t *testing.T) {
 	r.Register(&mockRegistryTool{
 		name:   "beta",
 		desc:   "tool B",
-		params: params,
+		params: schema(params),
 		result: SilentResult("ok"),
 	})
 

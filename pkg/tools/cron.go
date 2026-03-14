@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/sipeed/picoclaw/pkg/bus"
 	"github.com/sipeed/picoclaw/pkg/config"
 	"github.com/sipeed/picoclaw/pkg/cron"
@@ -23,6 +24,27 @@ type CronTool struct {
 	executor    JobExecutor
 	msgBus      *bus.MessageBus
 	execTool    *ExecTool
+}
+
+type cronParams struct {
+	Action       string `json:"action" jsonschema:"Action to perform. Use 'add' when user wants to schedule a reminder or task."`
+	Message      string `json:"message,omitempty" jsonschema:"The reminder/task message to display when triggered. If 'command' is used, this describes what the command does."`
+	Command      string `json:"command,omitempty" jsonschema:"Optional: Shell command to execute directly (e.g., 'df -h'). If set, the agent will run this command and report output instead of just showing the message. 'deliver' will be forced to false for commands."`
+	AtSeconds    int    `json:"at_seconds,omitempty" jsonschema:"One-time reminder: seconds from now when to trigger (e.g., 600 for 10 minutes later). Use this for one-time reminders like 'remind me in 10 minutes'."`
+	EverySeconds int    `json:"every_seconds,omitempty" jsonschema:"Recurring interval in seconds (e.g., 3600 for every hour). Use this ONLY for recurring tasks like 'every 2 hours' or 'daily reminder'."`
+	CronExpr     string `json:"cron_expr,omitempty" jsonschema:"Cron expression for complex recurring schedules (e.g., '0 9 * * *' for daily at 9am). Use this for complex recurring schedules."`
+	JobID        string `json:"job_id,omitempty" jsonschema:"Job ID (for remove/enable/disable)"`
+	Deliver      bool   `json:"deliver,omitempty" jsonschema:"If true, send message directly to channel. If false, let agent process message (for complex tasks). Default: true"`
+}
+
+var cronToolSpec = &ToolSpec{
+	Name:        "cron",
+	Description: "Schedule reminders, tasks, or system commands. IMPORTANT: When user asks to be reminded or scheduled, you MUST call this tool. Use 'at_seconds' for one-time reminders (e.g., 'remind me in 10 minutes' -> at_seconds=600). Use 'every_seconds' ONLY for recurring tasks (e.g., 'every 2 hours' -> every_seconds=7200). Use 'cron_expr' for complex recurring schedules. Use 'command' to execute shell commands directly.",
+	Parameters: schemaForParams[cronParams](
+		func(schema *jsonschema.Schema) {
+			schema.Properties["action"].Enum = []any{"add", "list", "remove", "enable", "disable"}
+		},
+	),
 }
 
 // NewCronTool creates a new CronTool
@@ -45,57 +67,8 @@ func NewCronTool(
 	}, nil
 }
 
-// Name returns the tool name
-func (t *CronTool) Name() string {
-	return "cron"
-}
-
-// Description returns the tool description
-func (t *CronTool) Description() string {
-	return "Schedule reminders, tasks, or system commands. IMPORTANT: When user asks to be reminded or scheduled, you MUST call this tool. Use 'at_seconds' for one-time reminders (e.g., 'remind me in 10 minutes' → at_seconds=600). Use 'every_seconds' ONLY for recurring tasks (e.g., 'every 2 hours' → every_seconds=7200). Use 'cron_expr' for complex recurring schedules. Use 'command' to execute shell commands directly."
-}
-
-// Parameters returns the tool parameters schema
-func (t *CronTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"action": map[string]any{
-				"type":        "string",
-				"enum":        []string{"add", "list", "remove", "enable", "disable"},
-				"description": "Action to perform. Use 'add' when user wants to schedule a reminder or task.",
-			},
-			"message": map[string]any{
-				"type":        "string",
-				"description": "The reminder/task message to display when triggered. If 'command' is used, this describes what the command does.",
-			},
-			"command": map[string]any{
-				"type":        "string",
-				"description": "Optional: Shell command to execute directly (e.g., 'df -h'). If set, the agent will run this command and report output instead of just showing the message. 'deliver' will be forced to false for commands.",
-			},
-			"at_seconds": map[string]any{
-				"type":        "integer",
-				"description": "One-time reminder: seconds from now when to trigger (e.g., 600 for 10 minutes later). Use this for one-time reminders like 'remind me in 10 minutes'.",
-			},
-			"every_seconds": map[string]any{
-				"type":        "integer",
-				"description": "Recurring interval in seconds (e.g., 3600 for every hour). Use this ONLY for recurring tasks like 'every 2 hours' or 'daily reminder'.",
-			},
-			"cron_expr": map[string]any{
-				"type":        "string",
-				"description": "Cron expression for complex recurring schedules (e.g., '0 9 * * *' for daily at 9am). Use this for complex recurring schedules.",
-			},
-			"job_id": map[string]any{
-				"type":        "string",
-				"description": "Job ID (for remove/enable/disable)",
-			},
-			"deliver": map[string]any{
-				"type":        "boolean",
-				"description": "If true, send message directly to channel. If false, let agent process message (for complex tasks). Default: true",
-			},
-		},
-		"required": []string{"action"},
-	}
+func (t *CronTool) Spec() *ToolSpec {
+	return cronToolSpec
 }
 
 // Execute runs the tool with the given arguments
@@ -177,14 +150,9 @@ func (t *CronTool) addJob(ctx context.Context, args map[string]any) *ToolResult 
 
 	command, _ := args["command"].(string)
 	if command != "" {
-		// Commands must be processed by agent/exec tool, so deliver must be false (or handled specifically)
-		// Actually, let's keep deliver=false to let the system know it's not a simple chat message
-		// But for our new logic in ExecuteJob, we can handle it regardless of deliver flag if Payload.Command is set.
-		// However, logically, it's not "delivered" to chat directly as is.
 		deliver = false
 	}
 
-	// Truncate message for job name (max 30 chars)
 	messagePreview := utils.Truncate(message, 30)
 
 	job, err := t.cronService.AddJob(
@@ -201,7 +169,6 @@ func (t *CronTool) addJob(ctx context.Context, args map[string]any) *ToolResult 
 
 	if command != "" {
 		job.Payload.Command = command
-		// Need to save the updated payload
 		t.cronService.UpdateJob(job)
 	}
 
@@ -266,11 +233,9 @@ func (t *CronTool) enableJob(args map[string]any, enable bool) *ToolResult {
 
 // ExecuteJob executes a cron job through the agent
 func (t *CronTool) ExecuteJob(ctx context.Context, job *cron.CronJob) string {
-	// Get channel/chatID from job payload
 	channel := job.Payload.Channel
 	chatID := job.Payload.To
 
-	// Default values if not set
 	if channel == "" {
 		channel = "cli"
 	}
@@ -278,7 +243,6 @@ func (t *CronTool) ExecuteJob(ctx context.Context, job *cron.CronJob) string {
 		chatID = "direct"
 	}
 
-	// Execute command if present
 	if job.Payload.Command != "" {
 		args := map[string]any{
 			"command": job.Payload.Command,
@@ -302,7 +266,6 @@ func (t *CronTool) ExecuteJob(ctx context.Context, job *cron.CronJob) string {
 		return "ok"
 	}
 
-	// If deliver=true, send message directly without agent processing
 	if job.Payload.Deliver {
 		pubCtx, pubCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer pubCancel()
@@ -314,10 +277,8 @@ func (t *CronTool) ExecuteJob(ctx context.Context, job *cron.CronJob) string {
 		return "ok"
 	}
 
-	// For deliver=false, process through agent (for complex tasks)
 	sessionKey := fmt.Sprintf("cron-%s", job.ID)
 
-	// Call agent with job's message
 	response, err := t.executor.ProcessDirectWithChannel(
 		ctx,
 		job.Payload.Message,
@@ -329,7 +290,6 @@ func (t *CronTool) ExecuteJob(ctx context.Context, job *cron.CronJob) string {
 		return fmt.Sprintf("Error: %v", err)
 	}
 
-	// Response is automatically sent via MessageBus by AgentLoop
-	_ = response // Will be sent by AgentLoop
+	_ = response
 	return "ok"
 }

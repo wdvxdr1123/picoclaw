@@ -24,6 +24,19 @@ type InstallSkillTool struct {
 	mu          sync.Mutex
 }
 
+type installSkillParams struct {
+	Slug     string `json:"slug" jsonschema:"The unique slug of the skill to install (e.g., 'github', 'docker-compose')"`
+	Version  string `json:"version,omitempty" jsonschema:"Specific version to install (optional, defaults to latest)"`
+	Registry string `json:"registry" jsonschema:"Registry to install from (required, e.g., 'clawhub')"`
+	Force    bool   `json:"force,omitempty" jsonschema:"Force reinstall if skill already exists (default false)"`
+}
+
+var installSkillToolSpec = &ToolSpec{
+	Name:        "install_skill",
+	Description: "Install a skill from a registry by slug. Downloads and extracts the skill into the workspace. Use find_skills first to discover available skills.",
+	Parameters:  schemaForParams[installSkillParams](),
+}
+
 // NewInstallSkillTool creates a new InstallSkillTool.
 // registryMgr is the shared registry manager (same instance as FindSkillsTool).
 // workspace is the root workspace directory; skills install to {workspace}/skills/{slug}/.
@@ -35,37 +48,8 @@ func NewInstallSkillTool(registryMgr *skills.RegistryManager, workspace string) 
 	}
 }
 
-func (t *InstallSkillTool) Name() string {
-	return "install_skill"
-}
-
-func (t *InstallSkillTool) Description() string {
-	return "Install a skill from a registry by slug. Downloads and extracts the skill into the workspace. Use find_skills first to discover available skills."
-}
-
-func (t *InstallSkillTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"slug": map[string]any{
-				"type":        "string",
-				"description": "The unique slug of the skill to install (e.g., 'github', 'docker-compose')",
-			},
-			"version": map[string]any{
-				"type":        "string",
-				"description": "Specific version to install (optional, defaults to latest)",
-			},
-			"registry": map[string]any{
-				"type":        "string",
-				"description": "Registry to install from (required, e.g., 'clawhub')",
-			},
-			"force": map[string]any{
-				"type":        "boolean",
-				"description": "Force reinstall if skill already exists (default false)",
-			},
-		},
-		"required": []string{"slug", "registry"},
-	}
+func (t *InstallSkillTool) Spec() *ToolSpec {
+	return installSkillToolSpec
 }
 
 func (t *InstallSkillTool) Execute(ctx context.Context, args map[string]any) *ToolResult {

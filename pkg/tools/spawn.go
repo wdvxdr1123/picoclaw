@@ -11,6 +11,18 @@ type SpawnTool struct {
 	allowlistCheck func(targetAgentID string) bool
 }
 
+type spawnParams struct {
+	Task    string `json:"task" jsonschema:"The task for subagent to complete"`
+	Label   string `json:"label,omitempty" jsonschema:"Optional short label for the task (for display)"`
+	AgentID string `json:"agent_id,omitempty" jsonschema:"Optional target agent ID to delegate the task to"`
+}
+
+var spawnToolSpec = &ToolSpec{
+	Name:        "spawn",
+	Description: "Spawn a subagent to handle a task in the background. Use this for complex or time-consuming tasks that can run independently. The subagent will complete the task and report back when done.",
+	Parameters:  schemaForParams[spawnParams](),
+}
+
 // Compile-time check: SpawnTool implements AsyncExecutor.
 var _ AsyncExecutor = (*SpawnTool)(nil)
 
@@ -20,33 +32,8 @@ func NewSpawnTool(manager *SubagentManager) *SpawnTool {
 	}
 }
 
-func (t *SpawnTool) Name() string {
-	return "spawn"
-}
-
-func (t *SpawnTool) Description() string {
-	return "Spawn a subagent to handle a task in the background. Use this for complex or time-consuming tasks that can run independently. The subagent will complete the task and report back when done."
-}
-
-func (t *SpawnTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"task": map[string]any{
-				"type":        "string",
-				"description": "The task for subagent to complete",
-			},
-			"label": map[string]any{
-				"type":        "string",
-				"description": "Optional short label for the task (for display)",
-			},
-			"agent_id": map[string]any{
-				"type":        "string",
-				"description": "Optional target agent ID to delegate the task to",
-			},
-		},
-		"required": []string{"task"},
-	}
+func (t *SpawnTool) Spec() *ToolSpec {
+	return spawnToolSpec
 }
 
 func (t *SpawnTool) SetAllowlistChecker(check func(targetAgentID string) bool) {

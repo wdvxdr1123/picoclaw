@@ -14,7 +14,7 @@ import (
 
 func TestInstallSkillToolName(t *testing.T) {
 	tool := NewInstallSkillTool(skills.NewRegistryManager(), t.TempDir())
-	assert.Equal(t, "install_skill", tool.Name())
+	assert.Equal(t, "install_skill", tool.Spec().Name)
 }
 
 func TestInstallSkillToolMissingSlug(t *testing.T) {
@@ -79,7 +79,7 @@ func TestInstallSkillToolRegistryNotFound(t *testing.T) {
 
 func TestInstallSkillToolParameters(t *testing.T) {
 	tool := NewInstallSkillTool(skills.NewRegistryManager(), t.TempDir())
-	params := tool.Parameters()
+	params := tool.Spec().Parameters.Map()
 
 	props, ok := params["properties"].(map[string]any)
 	assert.True(t, ok)
@@ -88,7 +88,7 @@ func TestInstallSkillToolParameters(t *testing.T) {
 	assert.Contains(t, props, "registry")
 	assert.Contains(t, props, "force")
 
-	required, ok := params["required"].([]string)
+	required, ok := params["required"].([]any)
 	assert.True(t, ok)
 	assert.Contains(t, required, "slug")
 	assert.Contains(t, required, "registry")

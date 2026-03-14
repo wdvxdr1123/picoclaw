@@ -82,8 +82,8 @@ func TestSubagentTool_Name(t *testing.T) {
 	manager := NewSubagentManager(provider, "test-model", "/tmp/test")
 	tool := NewSubagentTool(manager)
 
-	if tool.Name() != "subagent" {
-		t.Errorf("Expected name 'subagent', got '%s'", tool.Name())
+	if tool.Spec().Name != "subagent" {
+		t.Errorf("Expected name 'subagent', got '%s'", tool.Spec().Name)
 	}
 }
 
@@ -93,7 +93,7 @@ func TestSubagentTool_Description(t *testing.T) {
 	manager := NewSubagentManager(provider, "test-model", "/tmp/test")
 	tool := NewSubagentTool(manager)
 
-	desc := tool.Description()
+	desc := tool.Spec().Description
 	if desc == "" {
 		t.Error("Description should not be empty")
 	}
@@ -108,7 +108,7 @@ func TestSubagentTool_Parameters(t *testing.T) {
 	manager := NewSubagentManager(provider, "test-model", "/tmp/test")
 	tool := NewSubagentTool(manager)
 
-	params := tool.Parameters()
+	params := tool.Spec().Parameters.Map()
 	if params == nil {
 		t.Error("Parameters should not be nil")
 	}
@@ -143,7 +143,7 @@ func TestSubagentTool_Parameters(t *testing.T) {
 	}
 
 	// Check required fields
-	required, ok := params["required"].([]string)
+	required, ok := params["required"].([]any)
 	if !ok {
 		t.Fatal("Required should be a string array")
 	}

@@ -15,6 +15,18 @@ type EditFileTool struct {
 	fs fileSystem
 }
 
+type editFileParams struct {
+	Path    string `json:"path" jsonschema:"The file path to edit"`
+	OldText string `json:"old_text" jsonschema:"The exact text to find and replace"`
+	NewText string `json:"new_text" jsonschema:"The text to replace with"`
+}
+
+var editFileToolSpec = &ToolSpec{
+	Name:        "edit_file",
+	Description: "Edit a file by replacing old_text with new_text. The old_text must exist exactly in the file.",
+	Parameters:  schemaForParams[editFileParams](),
+}
+
 // NewEditFileTool creates a new EditFileTool with optional directory restriction.
 func NewEditFileTool(workspace string, restrict bool, allowPaths ...[]*regexp.Regexp) *EditFileTool {
 	var patterns []*regexp.Regexp
@@ -24,33 +36,8 @@ func NewEditFileTool(workspace string, restrict bool, allowPaths ...[]*regexp.Re
 	return &EditFileTool{fs: buildFs(workspace, restrict, patterns)}
 }
 
-func (t *EditFileTool) Name() string {
-	return "edit_file"
-}
-
-func (t *EditFileTool) Description() string {
-	return "Edit a file by replacing old_text with new_text. The old_text must exist exactly in the file."
-}
-
-func (t *EditFileTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"path": map[string]any{
-				"type":        "string",
-				"description": "The file path to edit",
-			},
-			"old_text": map[string]any{
-				"type":        "string",
-				"description": "The exact text to find and replace",
-			},
-			"new_text": map[string]any{
-				"type":        "string",
-				"description": "The text to replace with",
-			},
-		},
-		"required": []string{"path", "old_text", "new_text"},
-	}
+func (t *EditFileTool) Spec() *ToolSpec {
+	return editFileToolSpec
 }
 
 func (t *EditFileTool) Execute(ctx context.Context, args map[string]any) *ToolResult {
@@ -79,6 +66,17 @@ type AppendFileTool struct {
 	fs fileSystem
 }
 
+type appendFileParams struct {
+	Path    string `json:"path" jsonschema:"The file path to append to"`
+	Content string `json:"content" jsonschema:"The content to append"`
+}
+
+var appendFileToolSpec = &ToolSpec{
+	Name:        "append_file",
+	Description: "Append content to the end of a file",
+	Parameters:  schemaForParams[appendFileParams](),
+}
+
 func NewAppendFileTool(workspace string, restrict bool, allowPaths ...[]*regexp.Regexp) *AppendFileTool {
 	var patterns []*regexp.Regexp
 	if len(allowPaths) > 0 {
@@ -87,29 +85,8 @@ func NewAppendFileTool(workspace string, restrict bool, allowPaths ...[]*regexp.
 	return &AppendFileTool{fs: buildFs(workspace, restrict, patterns)}
 }
 
-func (t *AppendFileTool) Name() string {
-	return "append_file"
-}
-
-func (t *AppendFileTool) Description() string {
-	return "Append content to the end of a file"
-}
-
-func (t *AppendFileTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"path": map[string]any{
-				"type":        "string",
-				"description": "The file path to append to",
-			},
-			"content": map[string]any{
-				"type":        "string",
-				"description": "The content to append",
-			},
-		},
-		"required": []string{"path", "content"},
-	}
+func (t *AppendFileTool) Spec() *ToolSpec {
+	return appendFileToolSpec
 }
 
 func (t *AppendFileTool) Execute(ctx context.Context, args map[string]any) *ToolResult {

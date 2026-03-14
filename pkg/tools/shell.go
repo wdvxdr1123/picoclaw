@@ -25,6 +25,17 @@ type ExecTool struct {
 	restrictToWorkspace bool
 }
 
+type execParams struct {
+	Command    string `json:"command" jsonschema:"The shell command to execute"`
+	WorkingDir string `json:"working_dir,omitempty" jsonschema:"Optional working directory for the command"`
+}
+
+var execToolSpec = &ToolSpec{
+	Name:        "exec",
+	Description: "Execute a shell command and return its output. Use with caution.",
+	Parameters:  schemaForParams[execParams](),
+}
+
 var (
 	defaultDenyPatterns = []*regexp.Regexp{
 		regexp.MustCompile(`\brm\s+-[rf]{1,2}\b`),
@@ -77,7 +88,7 @@ var (
 	}
 
 	// absolutePathPattern matches absolute file paths in commands (Unix and Windows).
-	absolutePathPattern = regexp.MustCompile(`[A-Za-z]:\\[^\\\"']+|/[^\s\"']+`)
+	absolutePathPattern = regexp.MustCompile(`[A-Za-z]:\\[^\s"']+|/[^\s"']+`)
 
 	// safePaths are kernel pseudo-devices that are always safe to reference in
 	// commands, regardless of workspace restriction. They contain no user data
@@ -146,29 +157,8 @@ func NewExecToolWithConfig(workingDir string, restrict bool, config *config.Conf
 	}, nil
 }
 
-func (t *ExecTool) Name() string {
-	return "exec"
-}
-
-func (t *ExecTool) Description() string {
-	return "Execute a shell command and return its output. Use with caution."
-}
-
-func (t *ExecTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"command": map[string]any{
-				"type":        "string",
-				"description": "The shell command to execute",
-			},
-			"working_dir": map[string]any{
-				"type":        "string",
-				"description": "Optional working directory for the command",
-			},
-		},
-		"required": []string{"command"},
-	}
+func (t *ExecTool) Spec() *ToolSpec {
+	return execToolSpec
 }
 
 func (t *ExecTool) Execute(ctx context.Context, args map[string]any) *ToolResult {
@@ -335,31 +325,67 @@ func (t *ExecTool) guardCommand(command, cwd string) string {
 		if err != nil {
 			return ""
 		}
+		cwdPath = normalizeGuardPath(cwdPath)
 
 		matches := absolutePathPattern.FindAllString(cmd, -1)
 
 		for _, raw := range matches {
+			normalizedRaw := strings.ReplaceAll(raw, "\\", "/")
+			if safePaths[normalizedRaw] {
+				continue
+			}
+
 			p, err := filepath.Abs(raw)
 			if err != nil {
 				continue
 			}
+			p = normalizeGuardPath(p)
 
 			if safePaths[p] {
 				continue
 			}
 
-			rel, err := filepath.Rel(cwdPath, p)
-			if err != nil {
-				continue
-			}
-
-			if strings.HasPrefix(rel, "..") {
+			if !isSameOrWithinDir(cwdPath, p) {
 				return "Command blocked by safety guard (path outside working dir)"
 			}
 		}
 	}
 
 	return ""
+}
+
+func normalizeGuardPath(path string) string {
+	path = filepath.Clean(path)
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		path = resolved
+	}
+	if runtime.GOOS == "windows" {
+		path = strings.ToLower(path)
+	}
+	return path
+}
+
+func isSameOrWithinDir(base, candidate string) bool {
+	rel, err := filepath.Rel(base, candidate)
+	if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return true
+	}
+
+	baseInfo, err := os.Stat(base)
+	if err != nil {
+		return false
+	}
+
+	for current := candidate; ; current = filepath.Dir(current) {
+		info, err := os.Stat(current)
+		if err == nil && os.SameFile(baseInfo, info) {
+			return true
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return false
+		}
+	}
 }
 
 func (t *ExecTool) SetTimeout(timeout time.Duration) {

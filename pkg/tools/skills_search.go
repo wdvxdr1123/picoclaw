@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/sipeed/picoclaw/pkg/skills"
 )
 
@@ -12,6 +13,22 @@ import (
 type FindSkillsTool struct {
 	registryMgr *skills.RegistryManager
 	cache       *skills.SearchCache
+}
+
+type findSkillsParams struct {
+	Query string `json:"query" jsonschema:"Search query describing the desired skill capability (e.g., 'github integration', 'database management')"`
+	Limit int    `json:"limit,omitempty" jsonschema:"Maximum number of results to return (1-20, default 5)"`
+}
+
+var findSkillsToolSpec = &ToolSpec{
+	Name:        "find_skills",
+	Description: "Search for installable skills from skill registries. Returns skill slugs, descriptions, versions, and relevance scores. Use this to discover skills before installing them with install_skill.",
+	Parameters: schemaForParams[findSkillsParams](
+		func(schema *jsonschema.Schema) {
+			schema.Properties["limit"].Minimum = jsonschema.Ptr(1.0)
+			schema.Properties["limit"].Maximum = jsonschema.Ptr(20.0)
+		},
+	),
 }
 
 // NewFindSkillsTool creates a new FindSkillsTool.
@@ -24,31 +41,8 @@ func NewFindSkillsTool(registryMgr *skills.RegistryManager, cache *skills.Search
 	}
 }
 
-func (t *FindSkillsTool) Name() string {
-	return "find_skills"
-}
-
-func (t *FindSkillsTool) Description() string {
-	return "Search for installable skills from skill registries. Returns skill slugs, descriptions, versions, and relevance scores. Use this to discover skills before installing them with install_skill."
-}
-
-func (t *FindSkillsTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"query": map[string]any{
-				"type":        "string",
-				"description": "Search query describing the desired skill capability (e.g., 'github integration', 'database management')",
-			},
-			"limit": map[string]any{
-				"type":        "integer",
-				"description": "Maximum number of results to return (1-20, default 5)",
-				"minimum":     1.0,
-				"maximum":     20.0,
-			},
-		},
-		"required": []string{"query"},
-	}
+func (t *FindSkillsTool) Spec() *ToolSpec {
+	return findSkillsToolSpec
 }
 
 func (t *FindSkillsTool) Execute(ctx context.Context, args map[string]any) *ToolResult {

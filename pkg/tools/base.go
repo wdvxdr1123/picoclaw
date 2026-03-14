@@ -1,13 +1,21 @@
 package tools
 
-import "context"
+import (
+	"context"
+	"fmt"
+	"strings"
+)
 
 // Tool is the interface that all tools must implement.
 type Tool interface {
-	Name() string
-	Description() string
-	Parameters() map[string]any
+	Spec() *ToolSpec
 	Execute(ctx context.Context, args map[string]any) *ToolResult
+}
+
+type ToolSpec struct {
+	Name        string
+	Description string
+	Parameters  *Schema
 }
 
 // --- Request-scoped tool context (channel / chatID) ---
@@ -82,12 +90,50 @@ type AsyncExecutor interface {
 }
 
 func ToolToSchema(tool Tool) map[string]any {
+	spec := tool.Spec()
+	if spec == nil {
+		spec = &ToolSpec{}
+	}
+	parameters := spec.Parameters
+	if parameters == nil {
+		parameters = schema(nil)
+	}
 	return map[string]any{
 		"type": "function",
 		"function": map[string]any{
-			"name":        tool.Name(),
-			"description": tool.Description(),
-			"parameters":  tool.Parameters(),
+			"name":        spec.Name,
+			"description": spec.Description,
+			"parameters":  parameters.Map(),
 		},
 	}
+}
+
+func validateToolName(name string) error {
+	if name == "" {
+		return fmt.Errorf("tool name cannot be empty")
+	}
+	if len(name) > 128 {
+		return fmt.Errorf("tool name exceeds maximum length of 128 characters (current: %d)", len(name))
+	}
+	var invalidChars []string
+	seen := make(map[rune]bool)
+	for _, r := range name {
+		if !validToolNameRune(r) {
+			if !seen[r] {
+				invalidChars = append(invalidChars, fmt.Sprintf("%q", string(r)))
+				seen[r] = true
+			}
+		}
+	}
+	if len(invalidChars) > 0 {
+		return fmt.Errorf("tool name contains invalid characters: %s", strings.Join(invalidChars, ", "))
+	}
+	return nil
+}
+
+func validToolNameRune(r rune) bool {
+	return (r >= 'a' && r <= 'z') ||
+		(r >= 'A' && r <= 'Z') ||
+		(r >= '0' && r <= '9') ||
+		r == '_' || r == '-' || r == '.'
 }

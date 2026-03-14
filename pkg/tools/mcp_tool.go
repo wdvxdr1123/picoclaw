@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"strings"
@@ -25,15 +24,30 @@ type MCPTool struct {
 	manager    MCPManager
 	serverName string
 	tool       *mcp.Tool
+	spec       ToolSpec
 }
 
 // NewMCPTool creates a new MCP tool wrapper
 func NewMCPTool(manager MCPManager, serverName string, tool *mcp.Tool) *MCPTool {
-	return &MCPTool{
+	params, err := NewSchema(nil)
+	if tool != nil {
+		params, err = NewSchema(tool.InputSchema)
+	}
+	if err != nil {
+		params = schema(nil)
+	}
+
+	mcpTool := &MCPTool{
 		manager:    manager,
 		serverName: serverName,
 		tool:       tool,
 	}
+	mcpTool.spec = ToolSpec{
+		Name:        mcpTool.toolName(),
+		Description: mcpTool.toolDescription(),
+		Parameters:  params,
+	}
+	return mcpTool
 }
 
 // sanitizeIdentifierComponent normalizes a string so it can be safely used
@@ -96,7 +110,7 @@ func sanitizeIdentifierComponent(s string) string {
 // A short hash of the original (unsanitized) server and tool names is appended
 // whenever sanitization is lossy or the name is truncated, ensuring that two
 // names which differ only in disallowed characters remain distinct after sanitization.
-func (t *MCPTool) Name() string {
+func (t *MCPTool) toolName() string {
 	// Prefix with server name to avoid conflicts, and sanitize components
 	sanitizedServer := sanitizeIdentifierComponent(t.serverName)
 	sanitizedTool := sanitizeIdentifierComponent(t.tool.Name)
@@ -125,7 +139,7 @@ func (t *MCPTool) Name() string {
 }
 
 // Description returns the tool description
-func (t *MCPTool) Description() string {
+func (t *MCPTool) toolDescription() string {
 	desc := t.tool.Description
 	if desc == "" {
 		desc = fmt.Sprintf("MCP tool from %s server", t.serverName)
@@ -134,69 +148,8 @@ func (t *MCPTool) Description() string {
 	return fmt.Sprintf("[MCP:%s] %s", t.serverName, desc)
 }
 
-// Parameters returns the tool parameters schema
-func (t *MCPTool) Parameters() map[string]any {
-	// The InputSchema is already a JSON Schema object
-	schema := t.tool.InputSchema
-
-	// Handle nil schema
-	if schema == nil {
-		return map[string]any{
-			"type":       "object",
-			"properties": map[string]any{},
-			"required":   []string{},
-		}
-	}
-
-	// Try direct conversion first (fast path)
-	if schemaMap, ok := schema.(map[string]any); ok {
-		return schemaMap
-	}
-
-	// Handle json.RawMessage and []byte - unmarshal directly
-	var jsonData []byte
-	if rawMsg, ok := schema.(json.RawMessage); ok {
-		jsonData = rawMsg
-	} else if bytes, ok := schema.([]byte); ok {
-		jsonData = bytes
-	}
-
-	if jsonData != nil {
-		var result map[string]any
-		if err := json.Unmarshal(jsonData, &result); err == nil {
-			return result
-		}
-		// Fallback on error
-		return map[string]any{
-			"type":       "object",
-			"properties": map[string]any{},
-			"required":   []string{},
-		}
-	}
-
-	// For other types (structs, etc.), convert via JSON marshal/unmarshal
-	var err error
-	jsonData, err = json.Marshal(schema)
-	if err != nil {
-		// Fallback to empty schema if marshaling fails
-		return map[string]any{
-			"type":       "object",
-			"properties": map[string]any{},
-			"required":   []string{},
-		}
-	}
-
-	var result map[string]any
-	if err := json.Unmarshal(jsonData, &result); err != nil {
-		// Fallback to empty schema if unmarshaling fails
-		return map[string]any{
-			"type":       "object",
-			"properties": map[string]any{},
-			"required":   []string{},
-		}
-	}
-
-	return result
+func (t *MCPTool) Spec() *ToolSpec {
+	return &t.spec
 }
 
 // Execute executes the MCP tool

@@ -53,8 +53,8 @@ func TestNewMCPTool(t *testing.T) {
 		t.Fatal("NewMCPTool should not return nil")
 	}
 	// Verify tool properties we can access
-	if mcpTool.Name() != "mcp_test_server_test_tool" {
-		t.Errorf("Expected tool name with prefix, got '%s'", mcpTool.Name())
+	if mcpTool.Spec().Name != "mcp_test_server_test_tool" {
+		t.Errorf("Expected tool name with prefix, got '%s'", mcpTool.Spec().Name)
 	}
 }
 
@@ -92,7 +92,7 @@ func TestMCPTool_Name(t *testing.T) {
 			tool := &mcp.Tool{Name: tt.toolName}
 			mcpTool := NewMCPTool(manager, tt.serverName, tool)
 
-			result := mcpTool.Name()
+			result := mcpTool.Spec().Name
 			if result != tt.expected {
 				t.Errorf("Expected name '%s', got '%s'", tt.expected, result)
 			}
@@ -131,7 +131,7 @@ func TestMCPTool_Description(t *testing.T) {
 			}
 			mcpTool := NewMCPTool(manager, tt.serverName, tool)
 
-			result := mcpTool.Description()
+			result := mcpTool.Spec().Description
 
 			for _, expected := range tt.expectContains {
 				if !strings.Contains(result, expected) {
@@ -204,7 +204,7 @@ func TestMCPTool_Parameters(t *testing.T) {
 			}
 			mcpTool := NewMCPTool(manager, "test_server", tool)
 
-			params := mcpTool.Parameters()
+			params := mcpTool.Spec().Parameters.Map()
 
 			if params == nil {
 				t.Fatal("Parameters should not be nil")
@@ -469,7 +469,7 @@ func TestMCPTool_Parameters_MapSchema(t *testing.T) {
 	}
 	mcpTool := NewMCPTool(manager, "test_server", tool)
 
-	params := mcpTool.Parameters()
+	params := mcpTool.Spec().Parameters.Map()
 
 	// Should return the schema as-is when it's already a map
 	if params["type"] != "object" {

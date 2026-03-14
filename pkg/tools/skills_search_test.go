@@ -11,7 +11,7 @@ import (
 
 func TestFindSkillsToolName(t *testing.T) {
 	tool := NewFindSkillsTool(skills.NewRegistryManager(), nil)
-	assert.Equal(t, "find_skills", tool.Name())
+	assert.Equal(t, "find_skills", tool.Spec().Name)
 }
 
 func TestFindSkillsToolMissingQuery(t *testing.T) {
@@ -47,22 +47,22 @@ func TestFindSkillsToolCacheHit(t *testing.T) {
 
 func TestFindSkillsToolParameters(t *testing.T) {
 	tool := NewFindSkillsTool(skills.NewRegistryManager(), nil)
-	params := tool.Parameters()
+	params := tool.Spec().Parameters.Map()
 
 	props, ok := params["properties"].(map[string]any)
 	assert.True(t, ok)
 	assert.Contains(t, props, "query")
 	assert.Contains(t, props, "limit")
 
-	required, ok := params["required"].([]string)
+	required, ok := params["required"].([]any)
 	assert.True(t, ok)
 	assert.Contains(t, required, "query")
 }
 
 func TestFindSkillsToolDescription(t *testing.T) {
 	tool := NewFindSkillsTool(skills.NewRegistryManager(), nil)
-	assert.NotEmpty(t, tool.Description())
-	assert.Contains(t, tool.Description(), "skill")
+	assert.NotEmpty(t, tool.Spec().Description)
+	assert.Contains(t, tool.Spec().Description, "skill")
 }
 
 func TestFormatSearchResultsEmpty(t *testing.T) {

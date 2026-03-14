@@ -358,7 +358,7 @@ func (al *AgentLoop) Run(ctx context.Context) error {
 								"agent_id": agentID,
 								"server":   serverName,
 								"tool":     tool.Name,
-								"name":     mcpTool.Name(),
+								"name":     mcpTool.Spec().Name,
 							})
 					}
 				}

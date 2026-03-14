@@ -14,6 +14,7 @@ import (
 
 	htmltomarkdown "github.com/JohannesKaufmann/html-to-markdown/v2"
 	"github.com/JohannesKaufmann/html-to-markdown/v2/converter"
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/sipeed/picoclaw/pkg/providers"
 )
 
@@ -170,6 +171,22 @@ type WebSearchTool struct {
 	maxResults int
 }
 
+type webSearchParams struct {
+	Query string `json:"query" jsonschema:"Search query"`
+	Count int    `json:"count,omitempty" jsonschema:"Number of results (1-30)"`
+}
+
+var webSearchToolSpec = &ToolSpec{
+	Name:        "web_search",
+	Description: "Search the web for current information using the configured search backend.",
+	Parameters: schemaForParams[webSearchParams](
+		func(schema *jsonschema.Schema) {
+			schema.Properties["count"].Minimum = jsonschema.Ptr(1.0)
+			schema.Properties["count"].Maximum = jsonschema.Ptr(30.0)
+		},
+	),
+}
+
 type WebSearchToolOptions struct {
 	SearchProvider      string
 	OpenAISearchEnabled bool
@@ -224,31 +241,8 @@ func NewWebSearchTool(opts WebSearchToolOptions) (*WebSearchTool, error) {
 	}
 }
 
-func (t *WebSearchTool) Name() string {
-	return "web_search"
-}
-
-func (t *WebSearchTool) Description() string {
-	return "Search the web for current information using the configured search backend."
-}
-
-func (t *WebSearchTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"query": map[string]any{
-				"type":        "string",
-				"description": "Search query",
-			},
-			"count": map[string]any{
-				"type":        "integer",
-				"description": "Number of results (1-30)",
-				"minimum":     1.0,
-				"maximum":     30.0,
-			},
-		},
-		"required": []string{"query"},
-	}
+func (t *WebSearchTool) Spec() *ToolSpec {
+	return webSearchToolSpec
 }
 
 func (t *WebSearchTool) Execute(ctx context.Context, args map[string]any) *ToolResult {
@@ -275,6 +269,23 @@ type WebFetchTool struct {
 	proxy           string
 	client          *http.Client
 	fetchLimitBytes int64
+}
+
+type webFetchParams struct {
+	URL      string `json:"url" jsonschema:"URL to fetch"`
+	MaxChars int    `json:"maxChars,omitempty" jsonschema:"Maximum characters to extract"`
+	Format   string `json:"format,omitempty" jsonschema:"Output format. Defaults to 'markdown' (recommended) which preserves document structure, links, and formatting. Use 'text' for plain text extraction only."`
+}
+
+var webFetchToolSpec = &ToolSpec{
+	Name:        "web_fetch",
+	Description: "Fetch a URL and extract readable content. Markdown format is used by default and recommended for HTML pages as it better preserves document structure, links, and formatting.",
+	Parameters: schemaForParams[webFetchParams](
+		func(schema *jsonschema.Schema) {
+			schema.Properties["maxChars"].Minimum = jsonschema.Ptr(100.0)
+			schema.Properties["format"].Enum = []any{"markdown", "text"}
+		},
+	),
 }
 
 func NewWebFetchTool(maxChars int, fetchLimitBytes int64) (*WebFetchTool, error) {
@@ -310,35 +321,8 @@ func NewWebFetchToolWithProxy(
 	}, nil
 }
 
-func (t *WebFetchTool) Name() string {
-	return "web_fetch"
-}
-
-func (t *WebFetchTool) Description() string {
-	return "Fetch a URL and extract readable content. Markdown format is used by default and recommended for HTML pages as it better preserves document structure, links, and formatting."
-}
-
-func (t *WebFetchTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"url": map[string]any{
-				"type":        "string",
-				"description": "URL to fetch",
-			},
-			"maxChars": map[string]any{
-				"type":        "integer",
-				"description": "Maximum characters to extract",
-				"minimum":     100.0,
-			},
-			"format": map[string]any{
-				"type":        "string",
-				"description": "Output format. Defaults to 'markdown' (recommended) which preserves document structure, links, and formatting. Use 'text' for plain text extraction only.",
-				"enum":        []string{"markdown", "text"},
-			},
-		},
-		"required": []string{"url"},
-	}
+func (t *WebFetchTool) Spec() *ToolSpec {
+	return webFetchToolSpec
 }
 
 func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) *ToolResult {

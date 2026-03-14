@@ -25,7 +25,17 @@ func NewToolRegistry() *ToolRegistry {
 func (r *ToolRegistry) Register(tool Tool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	name := tool.Name()
+	spec := tool.Spec()
+	if spec == nil {
+		panic(fmt.Errorf("tool returned nil spec"))
+	}
+	if err := validateToolName(spec.Name); err != nil {
+		panic(err)
+	}
+	if spec.Parameters == nil {
+		panic(fmt.Errorf("tool %q is missing parameter schema", spec.Name))
+	}
+	name := spec.Name
 	if _, exists := r.tools[name]; exists {
 		logger.WarnCF("tools", "Tool registration overwrites existing tool",
 			map[string]any{"name": name})
@@ -74,6 +84,24 @@ func (r *ToolRegistry) ExecuteWithContext(
 	// Always inject — tools validate what they require.
 	ctx = WithToolContext(ctx, channel, chatID)
 
+	spec := tool.Spec()
+	if spec == nil {
+		return ErrorResult(fmt.Sprintf("tool %q returned nil spec", name)).WithError(fmt.Errorf("nil tool spec"))
+	}
+	parameters := spec.Parameters
+	if parameters == nil {
+		parameters = schema(nil)
+	}
+	validatedArgs, err := parameters.Apply(args)
+	if err != nil {
+		logger.ErrorCF("tool", "Tool parameter validation failed",
+			map[string]any{
+				"tool":  name,
+				"error": err.Error(),
+			})
+		return ErrorResult(fmt.Sprintf("invalid parameters for tool %q: %v", name, err)).WithError(err)
+	}
+
 	// If tool implements AsyncExecutor and callback is provided, use ExecuteAsync.
 	// The callback is a call parameter, not mutable state on the tool instance.
 	var result *ToolResult
@@ -83,9 +111,9 @@ func (r *ToolRegistry) ExecuteWithContext(
 			map[string]any{
 				"tool": name,
 			})
-		result = asyncExec.ExecuteAsync(ctx, args, asyncCallback)
+		result = asyncExec.ExecuteAsync(ctx, validatedArgs, asyncCallback)
 	} else {
-		result = tool.Execute(ctx, args)
+		result = tool.Execute(ctx, validatedArgs)
 	}
 	duration := time.Since(start)
 
@@ -149,25 +177,20 @@ func (r *ToolRegistry) ToProviderDefs() []providers.ToolDefinition {
 	sorted := r.sortedToolNames()
 	definitions := make([]providers.ToolDefinition, 0, len(sorted))
 	for _, name := range sorted {
-		tool := r.tools[name]
-		schema := ToolToSchema(tool)
-
-		// Safely extract nested values with type checks
-		fn, ok := schema["function"].(map[string]any)
-		if !ok {
+		spec := r.tools[name].Spec()
+		if spec == nil {
 			continue
 		}
-
-		name, _ := fn["name"].(string)
-		desc, _ := fn["description"].(string)
-		params, _ := fn["parameters"].(map[string]any)
-
+		parameters := spec.Parameters
+		if parameters == nil {
+			parameters = schema(nil)
+		}
 		definitions = append(definitions, providers.ToolDefinition{
 			Type: "function",
 			Function: providers.ToolFunctionDefinition{
-				Name:        name,
-				Description: desc,
-				Parameters:  params,
+				Name:        spec.Name,
+				Description: spec.Description,
+				Parameters:  parameters.Map(),
 			},
 		})
 	}
@@ -198,8 +221,11 @@ func (r *ToolRegistry) GetSummaries() []string {
 	sorted := r.sortedToolNames()
 	summaries := make([]string, 0, len(sorted))
 	for _, name := range sorted {
-		tool := r.tools[name]
-		summaries = append(summaries, fmt.Sprintf("- `%s` - %s", tool.Name(), tool.Description()))
+		spec := r.tools[name].Spec()
+		if spec == nil {
+			continue
+		}
+		summaries = append(summaries, fmt.Sprintf("- `%s` - %s", spec.Name, spec.Description))
 	}
 	return summaries
 }

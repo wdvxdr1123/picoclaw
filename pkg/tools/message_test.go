@@ -191,14 +191,14 @@ func TestMessageTool_Execute_NotConfigured(t *testing.T) {
 
 func TestMessageTool_Name(t *testing.T) {
 	tool := NewMessageTool()
-	if tool.Name() != "message" {
-		t.Errorf("Expected name 'message', got '%s'", tool.Name())
+	if tool.Spec().Name != "message" {
+		t.Errorf("Expected name 'message', got '%s'", tool.Spec().Name)
 	}
 }
 
 func TestMessageTool_Description(t *testing.T) {
 	tool := NewMessageTool()
-	desc := tool.Description()
+	desc := tool.Spec().Description
 	if desc == "" {
 		t.Error("Description should not be empty")
 	}
@@ -206,7 +206,7 @@ func TestMessageTool_Description(t *testing.T) {
 
 func TestMessageTool_Parameters(t *testing.T) {
 	tool := NewMessageTool()
-	params := tool.Parameters()
+	params := tool.Spec().Parameters.Map()
 
 	// Verify parameters structure
 	typ, ok := params["type"].(string)
@@ -220,7 +220,7 @@ func TestMessageTool_Parameters(t *testing.T) {
 	}
 
 	// Check required properties
-	required, ok := params["required"].([]string)
+	required, ok := params["required"].([]any)
 	if !ok || len(required) != 1 || required[0] != "content" {
 		t.Error("Expected 'content' to be required")
 	}

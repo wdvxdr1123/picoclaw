@@ -394,18 +394,18 @@ func (m *countingMockProvider) GetDefaultModel() string {
 // mockCustomTool is a simple mock tool for registration testing
 type mockCustomTool struct{}
 
-func (m *mockCustomTool) Name() string {
-	return "mock_custom"
-}
-
-func (m *mockCustomTool) Description() string {
-	return "Mock custom tool for testing"
-}
-
-func (m *mockCustomTool) Parameters() map[string]any {
-	return map[string]any{
+func (m *mockCustomTool) Spec() *tools.ToolSpec {
+	params, err := tools.NewSchema(map[string]any{
 		"type":       "object",
 		"properties": map[string]any{},
+	})
+	if err != nil {
+		panic(err)
+	}
+	return &tools.ToolSpec{
+		Name:        "mock_custom",
+		Description: "Mock custom tool for testing",
+		Parameters:  params,
 	}
 }
 

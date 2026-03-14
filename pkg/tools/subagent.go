@@ -230,35 +230,25 @@ type SubagentTool struct {
 	manager *SubagentManager
 }
 
+type subagentParams struct {
+	Task  string `json:"task" jsonschema:"The task for subagent to complete"`
+	Label string `json:"label,omitempty" jsonschema:"Optional short label for the task (for display)"`
+}
+
+var subagentToolSpec = &ToolSpec{
+	Name:        "subagent",
+	Description: "Execute a subagent task synchronously and return the result. Use this for delegating specific tasks to an independent agent instance. Returns execution summary to user and full details to LLM.",
+	Parameters:  schemaForParams[subagentParams](),
+}
+
 func NewSubagentTool(manager *SubagentManager) *SubagentTool {
 	return &SubagentTool{
 		manager: manager,
 	}
 }
 
-func (t *SubagentTool) Name() string {
-	return "subagent"
-}
-
-func (t *SubagentTool) Description() string {
-	return "Execute a subagent task synchronously and return the result. Use this for delegating specific tasks to an independent agent instance. Returns execution summary to user and full details to LLM."
-}
-
-func (t *SubagentTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"task": map[string]any{
-				"type":        "string",
-				"description": "The task for subagent to complete",
-			},
-			"label": map[string]any{
-				"type":        "string",
-				"description": "Optional short label for the task (for display)",
-			},
-		},
-		"required": []string{"task"},
-	}
+func (t *SubagentTool) Spec() *ToolSpec {
+	return subagentToolSpec
 }
 
 func (t *SubagentTool) Execute(ctx context.Context, args map[string]any) *ToolResult {

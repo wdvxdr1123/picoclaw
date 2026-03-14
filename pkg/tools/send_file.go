@@ -26,6 +26,17 @@ type SendFileTool struct {
 	defaultChatID  string
 }
 
+type sendFileParams struct {
+	Path     string `json:"path" jsonschema:"Path to the local file. Relative paths are resolved from workspace."`
+	Filename string `json:"filename,omitempty" jsonschema:"Optional display filename. Defaults to the basename of path."`
+}
+
+var sendFileToolSpec = &ToolSpec{
+	Name:        "send_file",
+	Description: "Send a local file (image, document, etc.) to the user on the current chat channel.",
+	Parameters:  schemaForParams[sendFileParams](),
+}
+
 func NewSendFileTool(workspace string, restrict bool, maxFileSize int, store media.MediaStore) *SendFileTool {
 	if maxFileSize <= 0 {
 		maxFileSize = config.DefaultMaxMediaSize
@@ -38,26 +49,8 @@ func NewSendFileTool(workspace string, restrict bool, maxFileSize int, store med
 	}
 }
 
-func (t *SendFileTool) Name() string { return "send_file" }
-func (t *SendFileTool) Description() string {
-	return "Send a local file (image, document, etc.) to the user on the current chat channel."
-}
-
-func (t *SendFileTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"path": map[string]any{
-				"type":        "string",
-				"description": "Path to the local file. Relative paths are resolved from workspace.",
-			},
-			"filename": map[string]any{
-				"type":        "string",
-				"description": "Optional display filename. Defaults to the basename of path.",
-			},
-		},
-		"required": []string{"path"},
-	}
+func (t *SendFileTool) Spec() *ToolSpec {
+	return sendFileToolSpec
 }
 
 func (t *SendFileTool) SetContext(channel, chatID string) {

@@ -88,6 +88,16 @@ type ReadFileTool struct {
 	fs fileSystem
 }
 
+type readFileParams struct {
+	Path string `json:"path" jsonschema:"Path to the file to read"`
+}
+
+var readFileToolSpec = &ToolSpec{
+	Name:        "read_file",
+	Description: "Read the contents of a file",
+	Parameters:  schemaForParams[readFileParams](),
+}
+
 func NewReadFileTool(workspace string, restrict bool, allowPaths ...[]*regexp.Regexp) *ReadFileTool {
 	var patterns []*regexp.Regexp
 	if len(allowPaths) > 0 {
@@ -96,25 +106,8 @@ func NewReadFileTool(workspace string, restrict bool, allowPaths ...[]*regexp.Re
 	return &ReadFileTool{fs: buildFs(workspace, restrict, patterns)}
 }
 
-func (t *ReadFileTool) Name() string {
-	return "read_file"
-}
-
-func (t *ReadFileTool) Description() string {
-	return "Read the contents of a file"
-}
-
-func (t *ReadFileTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"path": map[string]any{
-				"type":        "string",
-				"description": "Path to the file to read",
-			},
-		},
-		"required": []string{"path"},
-	}
+func (t *ReadFileTool) Spec() *ToolSpec {
+	return readFileToolSpec
 }
 
 func (t *ReadFileTool) Execute(ctx context.Context, args map[string]any) *ToolResult {
@@ -134,6 +127,17 @@ type WriteFileTool struct {
 	fs fileSystem
 }
 
+type writeFileParams struct {
+	Path    string `json:"path" jsonschema:"Path to the file to write"`
+	Content string `json:"content" jsonschema:"Content to write to the file"`
+}
+
+var writeFileToolSpec = &ToolSpec{
+	Name:        "write_file",
+	Description: "Write content to a file",
+	Parameters:  schemaForParams[writeFileParams](),
+}
+
 func NewWriteFileTool(workspace string, restrict bool, allowPaths ...[]*regexp.Regexp) *WriteFileTool {
 	var patterns []*regexp.Regexp
 	if len(allowPaths) > 0 {
@@ -142,29 +146,8 @@ func NewWriteFileTool(workspace string, restrict bool, allowPaths ...[]*regexp.R
 	return &WriteFileTool{fs: buildFs(workspace, restrict, patterns)}
 }
 
-func (t *WriteFileTool) Name() string {
-	return "write_file"
-}
-
-func (t *WriteFileTool) Description() string {
-	return "Write content to a file"
-}
-
-func (t *WriteFileTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"path": map[string]any{
-				"type":        "string",
-				"description": "Path to the file to write",
-			},
-			"content": map[string]any{
-				"type":        "string",
-				"description": "Content to write to the file",
-			},
-		},
-		"required": []string{"path", "content"},
-	}
+func (t *WriteFileTool) Spec() *ToolSpec {
+	return writeFileToolSpec
 }
 
 func (t *WriteFileTool) Execute(ctx context.Context, args map[string]any) *ToolResult {
@@ -189,6 +172,16 @@ type ListDirTool struct {
 	fs fileSystem
 }
 
+type listDirParams struct {
+	Path string `json:"path,omitempty" jsonschema:"Path to list"`
+}
+
+var listDirToolSpec = &ToolSpec{
+	Name:        "list_dir",
+	Description: "List files and directories in a path",
+	Parameters:  schemaForParams[listDirParams](),
+}
+
 func NewListDirTool(workspace string, restrict bool, allowPaths ...[]*regexp.Regexp) *ListDirTool {
 	var patterns []*regexp.Regexp
 	if len(allowPaths) > 0 {
@@ -197,25 +190,8 @@ func NewListDirTool(workspace string, restrict bool, allowPaths ...[]*regexp.Reg
 	return &ListDirTool{fs: buildFs(workspace, restrict, patterns)}
 }
 
-func (t *ListDirTool) Name() string {
-	return "list_dir"
-}
-
-func (t *ListDirTool) Description() string {
-	return "List files and directories in a path"
-}
-
-func (t *ListDirTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"path": map[string]any{
-				"type":        "string",
-				"description": "Path to list",
-			},
-		},
-		"required": []string{"path"},
-	}
+func (t *ListDirTool) Spec() *ToolSpec {
+	return listDirToolSpec
 }
 
 func (t *ListDirTool) Execute(ctx context.Context, args map[string]any) *ToolResult {

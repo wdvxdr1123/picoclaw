@@ -13,37 +13,24 @@ type MessageTool struct {
 	sentInRound  atomic.Bool // Tracks whether a message was sent in the current processing round
 }
 
+type messageParams struct {
+	Content string `json:"content" jsonschema:"The message content to send"`
+	Channel string `json:"channel,omitempty" jsonschema:"Optional: target channel (qqbot, feishu, etc.)"`
+	ChatID  string `json:"chat_id,omitempty" jsonschema:"Optional: target chat/user ID"`
+}
+
+var messageToolSpec = &ToolSpec{
+	Name:        "message",
+	Description: "Send a message to user on a chat channel. Use this when you want to communicate something.",
+	Parameters:  schemaForParams[messageParams](),
+}
+
 func NewMessageTool() *MessageTool {
 	return &MessageTool{}
 }
 
-func (t *MessageTool) Name() string {
-	return "message"
-}
-
-func (t *MessageTool) Description() string {
-	return "Send a message to user on a chat channel. Use this when you want to communicate something."
-}
-
-func (t *MessageTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"content": map[string]any{
-				"type":        "string",
-				"description": "The message content to send",
-			},
-			"channel": map[string]any{
-				"type":        "string",
-				"description": "Optional: target channel (qqbot, feishu, etc.)",
-			},
-			"chat_id": map[string]any{
-				"type":        "string",
-				"description": "Optional: target chat/user ID",
-			},
-		},
-		"required": []string{"content"},
-	}
+func (t *MessageTool) Spec() *ToolSpec {
+	return messageToolSpec
 }
 
 // ResetSentInRound resets the per-round send tracker.
