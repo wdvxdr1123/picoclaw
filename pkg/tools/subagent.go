@@ -2,11 +2,14 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
 
+	"github.com/sipeed/picoclaw/pkg/logger"
 	"github.com/sipeed/picoclaw/pkg/providers"
+	"github.com/sipeed/picoclaw/pkg/utils"
 )
 
 type SubagentTask struct {
@@ -141,25 +144,7 @@ After completing the task, provide a clear summary of what was done.`
 	}
 
 	// Run tool loop with access to tools
-	sm.mu.RLock()
-	tools := sm.tools
-	maxIter := sm.maxIterations
-	llmOptions := map[string]any(nil)
-	if len(sm.llmOptions) > 0 {
-		llmOptions = make(map[string]any, len(sm.llmOptions))
-		for k, v := range sm.llmOptions {
-			llmOptions[k] = v
-		}
-	}
-	sm.mu.RUnlock()
-
-	loopResult, err := RunToolLoop(ctx, ToolLoopConfig{
-		Provider:      sm.provider,
-		Model:         sm.defaultModel,
-		Tools:         tools,
-		MaxIterations: maxIter,
-		LLMOptions:    llmOptions,
-	}, messages, task.OriginChannel, task.OriginChatID)
+	loopResult, err := sm.runToolLoop(ctx, messages, task.OriginChannel, task.OriginChatID)
 
 	sm.mu.Lock()
 	var result *ToolResult
@@ -275,22 +260,10 @@ func (t *SubagentTool) Execute(ctx context.Context, args map[string]any) *ToolRe
 		},
 	}
 
-	// Use RunToolLoop to execute with tools (same as async SpawnTool)
+	// Use runToolLoop to execute with tools (same as async SpawnTool)
 	sm := t.manager
-	sm.mu.RLock()
-	tools := sm.tools
-	maxIter := sm.maxIterations
-	llmOptions := map[string]any(nil)
-	if len(sm.llmOptions) > 0 {
-		llmOptions = make(map[string]any, len(sm.llmOptions))
-		for k, v := range sm.llmOptions {
-			llmOptions[k] = v
-		}
-	}
-	sm.mu.RUnlock()
 
 	// Fall back to "cli"/"direct" for non-conversation callers (e.g., CLI, tests)
-	// to preserve the same defaults as the original NewSubagentTool constructor.
 	channel := ToolChannel(ctx)
 	if channel == "" {
 		channel = "cli"
@@ -300,13 +273,7 @@ func (t *SubagentTool) Execute(ctx context.Context, args map[string]any) *ToolRe
 		chatID = "direct"
 	}
 
-	loopResult, err := RunToolLoop(ctx, ToolLoopConfig{
-		Provider:      sm.provider,
-		Model:         sm.defaultModel,
-		Tools:         tools,
-		MaxIterations: maxIter,
-		LLMOptions:    llmOptions,
-	}, messages, channel, chatID)
+	loopResult, err := sm.runToolLoop(ctx, messages, channel, chatID)
 	if err != nil {
 		return ErrorResult(fmt.Sprintf("Subagent execution failed: %v", err)).WithError(err)
 	}
@@ -329,8 +296,114 @@ func (t *SubagentTool) Execute(ctx context.Context, args map[string]any) *ToolRe
 	return &ToolResult{
 		ForLLM:  llmContent,
 		ForUser: userContent,
-		Silent:  false,
-		IsError: false,
-		Async:   false,
 	}
+}
+
+// toolLoopResult contains the result of running the tool loop.
+type toolLoopResult struct {
+	Content    string
+	Iterations int
+}
+
+// runToolLoop executes the LLM + tool call iteration loop for subagent execution.
+func (sm *SubagentManager) runToolLoop(
+	ctx context.Context,
+	messages []providers.Message,
+	channel, chatID string,
+) (*toolLoopResult, error) {
+	sm.mu.RLock()
+	tools := sm.tools
+	maxIter := sm.maxIterations
+	var llmOptions map[string]any
+	if len(sm.llmOptions) > 0 {
+		llmOptions = make(map[string]any, len(sm.llmOptions))
+		for k, v := range sm.llmOptions {
+			llmOptions[k] = v
+		}
+	}
+	sm.mu.RUnlock()
+
+	var finalContent string
+	for iteration := 1; iteration <= maxIter; iteration++ {
+		var toolDefs []providers.ToolDefinition
+		if tools != nil {
+			toolDefs = tools.ToProviderDefs()
+		}
+
+		opts := llmOptions
+		if opts == nil {
+			opts = map[string]any{}
+		}
+
+		response, err := sm.provider.Chat(ctx, messages, toolDefs, sm.defaultModel, opts)
+		if err != nil {
+			return nil, fmt.Errorf("LLM call failed: %w", err)
+		}
+
+		if len(response.ToolCalls) == 0 {
+			finalContent = response.Content
+			break
+		}
+
+		normalized := make([]providers.ToolCall, 0, len(response.ToolCalls))
+		for _, tc := range response.ToolCalls {
+			normalized = append(normalized, providers.NormalizeToolCall(tc))
+		}
+
+		// Build assistant message
+		assistantMsg := providers.Message{
+			Role:    "assistant",
+			Content: response.Content,
+		}
+		for _, tc := range normalized {
+			argumentsJSON, _ := json.Marshal(tc.Arguments)
+			assistantMsg.ToolCalls = append(assistantMsg.ToolCalls, providers.ToolCall{
+				ID:   tc.ID,
+				Type: "function",
+				Name: tc.Name,
+				Function: &providers.FunctionCall{
+					Name:      tc.Name,
+					Arguments: string(argumentsJSON),
+				},
+			})
+		}
+		messages = append(messages, assistantMsg)
+
+		// Execute tool calls in parallel
+		type indexedResult struct {
+			result *ToolResult
+			tc     providers.ToolCall
+		}
+		results := make([]indexedResult, len(normalized))
+		var wg sync.WaitGroup
+		for i, tc := range normalized {
+			results[i].tc = tc
+			wg.Add(1)
+			go func(idx int, tc providers.ToolCall) {
+				defer wg.Done()
+				argsJSON, _ := json.Marshal(tc.Arguments)
+				logger.InfoCF("subagent", fmt.Sprintf("Tool call: %s(%s)", tc.Name, utils.Truncate(string(argsJSON), 200)), nil)
+				if tools != nil {
+					results[idx].result = tools.ExecuteWithContext(ctx, tc.Name, tc.Arguments, channel, chatID, nil)
+				} else {
+					results[idx].result = ErrorResult("no tools available")
+				}
+			}(i, tc)
+		}
+		wg.Wait()
+
+		for _, r := range results {
+			content := r.result.ForLLM
+			if content == "" && r.result.Err != nil {
+				content = r.result.Err.Error()
+			}
+			messages = append(messages, providers.Message{
+				Role:       "tool",
+				Content:    content,
+				ToolCallID: r.tc.ID,
+			})
+		}
+	}
+
+	return &toolLoopResult{Content: finalContent}, nil
 }

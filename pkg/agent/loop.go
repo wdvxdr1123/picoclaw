@@ -1333,17 +1333,17 @@ func (al *AgentLoop) selectCandidates(
 	userMsg string,
 	history []providers.Message,
 ) (candidates []providers.FallbackCandidate, model string) {
-	if agent.Router == nil || len(agent.LightCandidates) == 0 {
+	if agent.Routing.Router == nil || len(agent.Routing.LightCandidates) == 0 {
 		return agent.Candidates, agent.Model
 	}
 
-	_, usedLight, score := agent.Router.SelectModel(userMsg, history, agent.Model)
+	_, usedLight, score := agent.Routing.Router.SelectModel(userMsg, history, agent.Model)
 	if !usedLight {
 		logger.DebugCF("agent", "Model routing: primary model selected",
 			map[string]any{
 				"agent_id":  agent.ID,
 				"score":     score,
-				"threshold": agent.Router.Threshold(),
+				"threshold": agent.Routing.Router.Threshold(),
 			})
 		return agent.Candidates, agent.Model
 	}
@@ -1351,11 +1351,11 @@ func (al *AgentLoop) selectCandidates(
 	logger.InfoCF("agent", "Model routing: light model selected",
 		map[string]any{
 			"agent_id":    agent.ID,
-			"light_model": agent.Router.LightModel(),
+			"light_model": agent.Routing.Router.LightModel(),
 			"score":       score,
-			"threshold":   agent.Router.Threshold(),
+			"threshold":   agent.Routing.Router.Threshold(),
 		})
-	return agent.LightCandidates, agent.Router.LightModel()
+	return agent.Routing.LightCandidates, agent.Routing.Router.LightModel()
 }
 
 // maybeSummarize triggers summarization if the session history exceeds thresholds.

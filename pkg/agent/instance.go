@@ -18,29 +18,36 @@ import (
 // AgentInstance represents a fully configured agent with its own workspace,
 // session manager, context builder, and tool registry.
 type AgentInstance struct {
-	ID                        string
-	Name                      string
-	Model                     string
-	Fallbacks                 []string
-	Workspace                 string
+	// Identity
+	ID   string
+	Name string
+
+	// Model selection & routing
+	Model               string
+	ResolvedModelConfig *config.ModelConfig
+	Candidates          []providers.FallbackCandidate
+	Routing             ModelRouting
+
+	// Runtime infrastructure
+	Provider       providers.LLMProvider
+	Sessions       *session.SessionManager
+	ContextBuilder *ContextBuilder
+	Tools          *tools.ToolRegistry
+	Workspace      string
+
+	// Behaviour knobs
 	MaxIterations             int
 	SummarizeMessageThreshold int
 	SummarizeTokenPercent     int
-	Provider                  providers.LLMProvider
-	ResolvedModelConfig       *config.ModelConfig
-	Sessions                  *session.SessionManager
-	ContextBuilder            *ContextBuilder
-	Tools                     *tools.ToolRegistry
-	Subagents                 *config.SubagentsConfig
-	SkillsFilter              []string
-	Candidates                []providers.FallbackCandidate
 
-	// Router is non-nil when model routing is configured and the light model
-	// was successfully resolved. It scores each incoming message and decides
-	// whether to route to LightCandidates or stay with Candidates.
-	Router *routing.Router
-	// LightCandidates holds the resolved provider candidates for the light model.
-	// Pre-computed at agent creation to avoid repeated model_list lookups at runtime.
+	// Multi-agent
+	Subagents *config.SubagentsConfig
+}
+
+// ModelRouting holds pre-resolved state for light-model routing.
+// Zero value means routing is disabled.
+type ModelRouting struct {
+	Router          *routing.Router
 	LightCandidates []providers.FallbackCandidate
 }
 
@@ -98,13 +105,11 @@ func NewAgentInstance(
 	agentID := routing.DefaultAgentID
 	agentName := ""
 	var subagents *config.SubagentsConfig
-	var skillsFilter []string
 
 	if agentCfg != nil {
 		agentID = routing.NormalizeAgentID(agentCfg.ID)
 		agentName = agentCfg.Name
 		subagents = agentCfg.Subagents
-		skillsFilter = agentCfg.Skills
 	}
 
 	maxIter := cfg.LoopControl.MaxStepsPerTurn
@@ -197,24 +202,24 @@ func NewAgentInstance(
 	}
 
 	return &AgentInstance{
-		ID:                        agentID,
-		Name:                      agentName,
-		Model:                     model,
-		Fallbacks:                 fallbacks,
+		ID:                  agentID,
+		Name:                agentName,
+		Model:               model,
+		ResolvedModelConfig: modelResolved,
+		Candidates:          candidates,
+		Routing: ModelRouting{
+			Router:          router,
+			LightCandidates: lightCandidates,
+		},
+		Provider:                  provider,
+		Sessions:                  sessionsManager,
+		ContextBuilder:            contextBuilder,
+		Tools:                     toolsRegistry,
 		Workspace:                 workspace,
 		MaxIterations:             maxIter,
 		SummarizeMessageThreshold: summarizeMessageThreshold,
 		SummarizeTokenPercent:     summarizeTokenPercent,
-		Provider:                  provider,
-		ResolvedModelConfig:       modelResolved,
-		Sessions:                  sessionsManager,
-		ContextBuilder:            contextBuilder,
-		Tools:                     toolsRegistry,
 		Subagents:                 subagents,
-		SkillsFilter:              skillsFilter,
-		Candidates:                candidates,
-		Router:                    router,
-		LightCandidates:           lightCandidates,
 	}
 }
 

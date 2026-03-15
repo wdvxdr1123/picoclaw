@@ -1,6 +1,8 @@
 package tools
 
-import "encoding/json"
+import (
+	"errors"
+)
 
 // ToolResult represents the structured return value from tool execution.
 // It provides clear semantics for different types of results and supports
@@ -97,30 +99,8 @@ func AsyncResult(forLLM string) *ToolResult {
 func ErrorResult(message string) *ToolResult {
 	return &ToolResult{
 		ForLLM:  message,
-		Silent:  false,
 		IsError: true,
-		Async:   false,
-	}
-}
-
-// UserResult creates a ToolResult with content for both LLM and user.
-// Both ForLLM and ForUser are set to the same content.
-//
-// Use this when the user needs to see the result directly:
-// - Command execution output
-// - Fetched web content
-// - Query results
-//
-// Example:
-//
-//	result := UserResult("Total files found: 42")
-func UserResult(content string) *ToolResult {
-	return &ToolResult{
-		ForLLM:  content,
-		ForUser: content,
-		Silent:  false,
-		IsError: false,
-		Async:   false,
+		Err:     errors.New(message),
 	}
 }
 
@@ -135,17 +115,6 @@ func MediaResult(forLLM string, mediaRefs []string) *ToolResult {
 		ForLLM: forLLM,
 		Media:  mediaRefs,
 	}
-}
-
-// MarshalJSON implements custom JSON serialization.
-// The Err field is excluded from JSON output via the json:"-" tag.
-func (tr *ToolResult) MarshalJSON() ([]byte, error) {
-	type Alias ToolResult
-	return json.Marshal(&struct {
-		*Alias
-	}{
-		Alias: (*Alias)(tr),
-	})
 }
 
 // WithError sets the Err field and returns the result for chaining.

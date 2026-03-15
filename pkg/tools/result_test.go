@@ -72,26 +72,11 @@ func TestErrorResult(t *testing.T) {
 	if result.Async {
 		t.Error("Expected Async to be false")
 	}
-}
-
-func TestUserResult(t *testing.T) {
-	content := "user visible message"
-	result := UserResult(content)
-
-	if result.ForLLM != content {
-		t.Errorf("Expected ForLLM '%s', got '%s'", content, result.ForLLM)
+	if result.Err == nil {
+		t.Error("Expected Err to be auto-set")
 	}
-	if result.ForUser != content {
-		t.Errorf("Expected ForUser '%s', got '%s'", content, result.ForUser)
-	}
-	if result.Silent {
-		t.Error("Expected Silent to be false")
-	}
-	if result.IsError {
-		t.Error("Expected IsError to be false")
-	}
-	if result.Async {
-		t.Error("Expected Async to be false")
+	if result.Err.Error() != "operation failed" {
+		t.Errorf("Expected Err message 'operation failed', got '%s'", result.Err.Error())
 	}
 }
 
@@ -115,10 +100,6 @@ func TestToolResultJSONSerialization(t *testing.T) {
 		{
 			name:   "error result",
 			result: ErrorResult("error content"),
-		},
-		{
-			name:   "user result",
-			result: UserResult("user content"),
 		},
 	}
 
@@ -184,7 +165,10 @@ func TestToolResultWithErrors(t *testing.T) {
 }
 
 func TestToolResultJSONStructure(t *testing.T) {
-	result := UserResult("test content")
+	result := &ToolResult{
+		ForLLM:  "test content",
+		ForUser: "test content",
+	}
 
 	data, err := json.Marshal(result)
 	if err != nil {

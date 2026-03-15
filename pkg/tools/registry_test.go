@@ -267,29 +267,6 @@ func TestToolRegistry_ExecuteWithContext_AsyncCallback(t *testing.T) {
 	}
 }
 
-func TestToolRegistry_GetDefinitions(t *testing.T) {
-	r := NewToolRegistry()
-	r.Register(newMockTool("alpha", "tool A"))
-
-	defs := r.GetDefinitions()
-	if len(defs) != 1 {
-		t.Fatalf("expected 1 definition, got %d", len(defs))
-	}
-	if defs[0]["type"] != "function" {
-		t.Errorf("expected type 'function', got %v", defs[0]["type"])
-	}
-	fn, ok := defs[0]["function"].(map[string]any)
-	if !ok {
-		t.Fatal("expected 'function' key to be a map")
-	}
-	if fn["name"] != "alpha" {
-		t.Errorf("expected name 'alpha', got %v", fn["name"])
-	}
-	if fn["description"] != "tool A" {
-		t.Errorf("expected description 'tool A', got %v", fn["description"])
-	}
-}
-
 func TestToolRegistry_ToProviderDefs(t *testing.T) {
 	r := NewToolRegistry()
 	params := map[string]any{"type": "object", "properties": map[string]any{}}
@@ -362,44 +339,6 @@ func TestToolRegistry_Count(t *testing.T) {
 	}
 }
 
-func TestToolRegistry_GetSummaries(t *testing.T) {
-	r := NewToolRegistry()
-	r.Register(newMockTool("read_file", "Reads a file"))
-
-	summaries := r.GetSummaries()
-	if len(summaries) != 1 {
-		t.Fatalf("expected 1 summary, got %d", len(summaries))
-	}
-	if !strings.Contains(summaries[0], "`read_file`") {
-		t.Errorf("expected backtick-quoted name in summary, got %q", summaries[0])
-	}
-	if !strings.Contains(summaries[0], "Reads a file") {
-		t.Errorf("expected description in summary, got %q", summaries[0])
-	}
-}
-
-func TestToolToSchema(t *testing.T) {
-	tool := newMockTool("demo", "demo tool")
-	schema := ToolToSchema(tool)
-
-	if schema["type"] != "function" {
-		t.Errorf("expected type 'function', got %v", schema["type"])
-	}
-	fn, ok := schema["function"].(map[string]any)
-	if !ok {
-		t.Fatal("expected 'function' to be a map")
-	}
-	if fn["name"] != "demo" {
-		t.Errorf("expected name 'demo', got %v", fn["name"])
-	}
-	if fn["description"] != "demo tool" {
-		t.Errorf("expected description 'demo tool', got %v", fn["description"])
-	}
-	if fn["parameters"] == nil {
-		t.Error("expected parameters to be set")
-	}
-}
-
 func TestToolRegistry_ConcurrentAccess(t *testing.T) {
 	r := NewToolRegistry()
 	var wg sync.WaitGroup
@@ -413,7 +352,7 @@ func TestToolRegistry_ConcurrentAccess(t *testing.T) {
 			r.Get(name)
 			r.Count()
 			r.List()
-			r.GetDefinitions()
+			r.ToProviderDefs()
 		}(i)
 	}
 

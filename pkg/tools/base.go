@@ -89,25 +89,6 @@ type AsyncExecutor interface {
 	ExecuteAsync(ctx context.Context, args map[string]any, cb AsyncCallback) *ToolResult
 }
 
-func ToolToSchema(tool Tool) map[string]any {
-	spec := tool.Spec()
-	if spec == nil {
-		spec = &ToolSpec{}
-	}
-	parameters := spec.Parameters
-	if parameters == nil {
-		parameters = schema(nil)
-	}
-	return map[string]any{
-		"type": "function",
-		"function": map[string]any{
-			"name":        spec.Name,
-			"description": spec.Description,
-			"parameters":  parameters.Map(),
-		},
-	}
-}
-
 func validateToolName(name string) error {
 	if name == "" {
 		return fmt.Errorf("tool name cannot be empty")

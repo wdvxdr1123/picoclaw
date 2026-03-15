@@ -156,18 +156,6 @@ func (r *ToolRegistry) sortedToolNames() []string {
 	return names
 }
 
-func (r *ToolRegistry) GetDefinitions() []map[string]any {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	sorted := r.sortedToolNames()
-	definitions := make([]map[string]any, 0, len(sorted))
-	for _, name := range sorted {
-		definitions = append(definitions, ToolToSchema(r.tools[name]))
-	}
-	return definitions
-}
-
 // ToProviderDefs converts tool definitions to provider-compatible format.
 // This is the format expected by LLM provider APIs.
 func (r *ToolRegistry) ToProviderDefs() []providers.ToolDefinition {
@@ -210,22 +198,4 @@ func (r *ToolRegistry) Count() int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return len(r.tools)
-}
-
-// GetSummaries returns human-readable summaries of all registered tools.
-// Returns a slice of "name - description" strings.
-func (r *ToolRegistry) GetSummaries() []string {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	sorted := r.sortedToolNames()
-	summaries := make([]string, 0, len(sorted))
-	for _, name := range sorted {
-		spec := r.tools[name].Spec()
-		if spec == nil {
-			continue
-		}
-		summaries = append(summaries, fmt.Sprintf("- `%s` - %s", spec.Name, spec.Description))
-	}
-	return summaries
 }

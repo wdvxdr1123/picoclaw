@@ -181,8 +181,9 @@ func TestAgentInstance_FallbackInheritance(t *testing.T) {
 	registry := NewAgentRegistry(cfg, &mockRegistryProvider{})
 
 	agent, _ := registry.GetAgent("inherit")
-	if len(agent.Fallbacks) != 2 {
-		t.Errorf("expected 2 fallbacks inherited from defaults, got %d", len(agent.Fallbacks))
+	// Primary + 2 fallbacks = at least 3 candidates
+	if len(agent.Candidates) < 3 {
+		t.Errorf("expected at least 3 candidates (primary + 2 fallbacks), got %d", len(agent.Candidates))
 	}
 }
 
@@ -198,7 +199,8 @@ func TestAgentInstance_FallbackExplicitEmpty(t *testing.T) {
 	registry := NewAgentRegistry(cfg, &mockRegistryProvider{})
 
 	agent, _ := registry.GetAgent("no-fallback")
-	if len(agent.Fallbacks) != 0 {
-		t.Errorf("expected 0 fallbacks (explicit empty), got %d: %v", len(agent.Fallbacks), agent.Fallbacks)
+	// Only primary model, no fallbacks
+	if len(agent.Candidates) != 1 {
+		t.Errorf("expected 1 candidate (primary only), got %d", len(agent.Candidates))
 	}
 }
